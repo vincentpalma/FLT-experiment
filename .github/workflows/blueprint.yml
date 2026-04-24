@@ -113,9 +113,9 @@ jobs:
             # that are not required for CI blueprint generation.
             pip install \
               "plasTeX @ git+https://github.com/plastex/plastex.git" \
-              "plastexdepgraph @ file://${FLT_REPO_ROOT}/vendor/plastexdepgraph" \
-              "plastexshowmore @ git+https://github.com/PatrickMassot/plastexshowmore.git" \
-              "leanblueprint @ git+https://github.com/PatrickMassot/leanblueprint.git"
+              "plastexshowmore @ git+https://github.com/PatrickMassot/plastexshowmore.git"
+            pip install ./vendor/plastexdepgraph
+            pip install "leanblueprint @ git+https://github.com/PatrickMassot/leanblueprint.git"
             leanblueprint pdf
             mkdir -p docs
             cp blueprint/print/print.pdf docs/blueprint.pdf
