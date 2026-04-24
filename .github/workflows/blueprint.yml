@@ -105,10 +105,17 @@ jobs:
             git config --global --add safe.directory $GITHUB_WORKSPACE
             git config --global --add safe.directory `pwd`
             python3 -m venv env
-            source env/bin/activate
+            . env/bin/activate
             pip install --upgrade pip requests wheel
             pip install pygraphviz --config-settings="--global-option=build_ext" --config-settings="--global-option=-L/usr/lib/graphviz/" --config-settings="--global-option=-R/usr/lib/graphviz/"
-            pip install -r blueprint/requirements.txt
+            # We intentionally avoid installing blueprint/requirements.txt here
+            # because it includes local dev-only pins (e.g. pandoc/watchfiles)
+            # that are not required for CI blueprint generation.
+            pip install \
+              "plasTeX @ git+https://github.com/plastex/plastex.git" \
+              "plastexshowmore @ git+https://github.com/PatrickMassot/plastexshowmore.git"
+            pip install ./vendor/plastexdepgraph
+            pip install "leanblueprint @ git+https://github.com/PatrickMassot/leanblueprint.git"
             leanblueprint pdf
             mkdir -p docs
             cp blueprint/print/print.pdf docs/blueprint.pdf
