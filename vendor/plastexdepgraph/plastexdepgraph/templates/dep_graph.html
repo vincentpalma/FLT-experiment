@@ -1,0 +1,2646 @@
+﻿{% macro icon(icon, id='', class='') %}
+<svg  {% if id %}id="{{id}}" {% endif %}class="icon icon-{{ icon }} {{ class }}"><use xlink:href="symbol-defs.svg#icon-{{ icon }}"></use></svg>
+{% endmacro %}
+{% macro modal(id) %}
+    <div class="dep-modal-container" id="{{ id }}">
+      <div class="dep-modal-content">
+          <button class="dep-closebtn">{{ icon('cross') }}</button>
+        {{ caller() }}
+      </div>
+    </div>
+{% endmacro %}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{ context.terms.get('Dependency graph', 'Dependency graph') }}</title>
+  <meta name="generator" content="plasTeX" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles/theme-{{ config['html5']['theme-css'] }}.css" />
+  <link rel="stylesheet" href="styles/dep_graph.css" />
+  {% if config.html5['use-mathjax'] %}
+  <script type="text/x-mathjax-config">
+  {% if config.html5['mathjax-dollars'] %}
+    MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+  {% else %}
+    MathJax.Hub.Config({tex2jax: {inlineMath: [ ['\\(','\\)']]}});
+  {% endif %}
+  </script>
+{% if config['mathjax-macros']['macros'] %}
+<script>
+  MathJax = { 
+    tex: {
+      macros: { {% for key, val in config['mathjax-macros']['macros'].items() %}
+        {{ key }}: {{ val }},
+        {% endfor %}
+      } } }
+  </script>
+{% endif %}
+  <script type="text/javascript" src="{{ config.html5['mathjax-url'] }}">  </script>
+{% endif %}
+{% for css in config.html5.get('extra-css', []) %}
+<link rel="stylesheet" href="styles/{{ css }}" />
+{% endfor %}
+</head>
+
+<body>
+<header>
+  <nav class="depgraph-header-nav" aria-label="Dependency graph controls">
+    <a class="toc" href="index.html">Home</a>
+    <button id="depgraph-nav-toggle" class="depgraph-header-button depgraph-header-button--active" type="button" aria-controls="depgraph-sidebar" aria-expanded="true">Navigate</button>
+    <button id="legend_title" class="depgraph-header-button" type="button" aria-controls="Legend" aria-expanded="false">Legend</button>
+  </nav>
+  <h1 id="doc_title">{{ title }}</h1>
+</header>
+<div class="wrapper">
+<div class="content">
+  <div class="depgraph-layout">
+    <aside id="depgraph-sidebar" class="depgraph-sidebar" aria-label="Dependency graph chapter navigation">
+      <div class="depgraph-sidebar__header">
+        <div class="depgraph-sidebar__topline">
+          <button id="depgraph-sidebar-back" class="depgraph-sidebar__back" type="button" aria-label="Back to chapters" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-return-left" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path fill-rule="evenodd" d="M14.5 1.5a.5.5 0 0 1 .5.5v4.8a2.5 2.5 0 0 1-2.5 2.5H2.707l3.347 3.346a.5.5 0 0 1-.708.708l-4.2-4.2a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 8.3H12.5A1.5 1.5 0 0 0 14 6.8V2a.5.5 0 0 1 .5-.5"/>
+            </svg>
+          </button>
+          <h2 id="depgraph-sidebar-title" class="depgraph-sidebar__title">Chapters</h2>
+        </div>
+        <p id="depgraph-sidebar-subtitle" class="depgraph-sidebar__subtitle">Hover to preview a chapter in the graph.</p>
+      </div>
+      <div id="depgraph-sidebar-status" class="depgraph-sidebar__status"></div>
+      <ul id="depgraph-sidebar-list" class="depgraph-sidebar__list" hidden></ul>
+    </aside>
+    <div class="depgraph-stage">
+      <div id="Legend">
+        <dl class="legend">
+          {% for k, v in legend %}
+          <dt>{{ k }}</dt><dd>{{ v }}</dd>
+          {% endfor %}
+        </dl>
+      </div>
+      <div id="graph">
+        <div id="depgraph-render"></div>
+        <svg id="depgraph-overlay" aria-hidden="true">
+          <g id="depgraph-overlay-scene">
+            <g class="depgraph-edge-hitbox-layer"></g>
+            <g class="depgraph-collapsed-summary-layer"></g>
+            <g class="depgraph-collapsed-badge-layer"></g>
+          </g>
+        </svg>
+        <div id="depgraph-ui"></div>
+      </div>
+    </div>
+  </div>
+<div id="statements">
+{%- for thm in graph.nodes | sort(attribute='id') %}
+    {% call modal(thm.id + "_modal") %}
+  <div class="thm" id="{{ thm.id }}" style="display: none">
+    <div class="thm_thmheading">
+      <span class="{{ thm.thmName }}_thmcaption">
+      {{ thm.caption }}
+      </span>
+      {% if thm.ref -%}
+      <span class="{{thm.thmName}}_thmlabel">{{thm.ref}}</span>
+      {%- endif -%}
+      {% if thm.title -%}
+      <span class="{{thm.thmName}}_thmtitle">{{ thm.title }}</span>
+      {%- endif -%}
+    </div>
+    <div class="thm_thmcontent">{{ thm }}</div>
+
+    <a class="latex_link" href="{{ thm.url }}">LaTeX</a>
+    {% for extra in extra_modal_links %}
+    {% include extra %}
+    {% endfor %}
+  </div>
+    {% endcall %}
+{%- endfor -%}
+</div>
+</div> <!-- content -->
+</div> <!-- wrapper -->
+<script id="depgraph-navigation-data" type="application/json">{{ navigation_payload_json }}</script>
+<script src="js/jquery.min.js" type="text/javascript"></script>
+
+<script src="js/d3.min.js"></script>
+<script src="js/hpcc.min.js"></script>
+<script src="js/d3-graphviz.js"></script>
+
+<script type="text/javascript">
+const graphElement = document.getElementById('graph');
+const graphRenderElement = document.getElementById('depgraph-render');
+const graphOverlayElement = document.getElementById('depgraph-overlay');
+const graphOverlaySceneElement = document.getElementById('depgraph-overlay-scene');
+const graphUiElement = document.getElementById('depgraph-ui');
+const graphContainer = d3.select(graphRenderElement);
+const depGraphSidebarRoot = document.getElementById('depgraph-sidebar');
+const depGraphSidebarList = document.getElementById('depgraph-sidebar-list');
+const depGraphSidebarStatus = document.getElementById('depgraph-sidebar-status');
+const depGraphSidebarTitle = document.getElementById('depgraph-sidebar-title');
+const depGraphSidebarSubtitle = document.getElementById('depgraph-sidebar-subtitle');
+const depGraphSidebarBackButton = document.getElementById('depgraph-sidebar-back');
+const depGraphNavToggle = document.getElementById('depgraph-nav-toggle');
+const depGraphLegendToggle = document.getElementById('legend_title');
+const depGraphNavigationDataElement = document.getElementById('depgraph-navigation-data');
+const dotSource = `{{ dot.replace('\n','') }}`;
+const depGraphCloseIcon = '<svg class="icon icon-cross"><use xlink:href="symbol-defs.svg#icon-cross"></use></svg>';
+const graphviz = graphContainer.graphviz({useWorker: true}).keyMode('id');
+const depGraphSvgNs = 'http://www.w3.org/2000/svg';
+const depGraphRelayoutDuration = 650;
+let depGraphState = null;
+let depGraphTooltip = null;
+let depGraphHoverTooltip = null;
+let depGraphActionMenu = null;
+let depGraphActionMenuTrigger = null;
+let depGraphPinnedNode = null;
+let depGraphSyncFrame = 0;
+let depGraphCollapsedBadgeItems = [];
+let depGraphCollapsedBadgeClick = null;
+let depGraphSidebarState = null;
+const depGraphChapterSidebarEventTarget = new EventTarget();
+let depGraphNavigationData = null;
+let depGraphRenderedGraphKey = null;
+let depGraphRenderingGraphKey = null;
+let depGraphGlobalInteractionsBound = false;
+let depGraphResizeObserver = null;
+let depGraphZoomSyncBound = false;
+function setRelayoutAnimating(isAnimating) {
+  graphElement.classList.toggle('depgraph-relayouting', isAnimating);
+}
+
+function depGraphRelayoutTransitionFactory() {
+  return d3.transition('depgraph-relayout')
+    .duration(depGraphRelayoutDuration)
+    .ease(d3.easeCubicInOut);
+}
+
+function parseEdgeTitle(title) {
+  const arrowIndex = title.indexOf('->');
+  if (arrowIndex === -1) {
+    return null;
+  }
+
+  return {
+    source: title.slice(0, arrowIndex).trim(),
+    target: title.slice(arrowIndex + 2).trim(),
+  };
+}
+
+function navigationPayload() {
+  if (depGraphNavigationData !== null) {
+    return depGraphNavigationData;
+  }
+  if (!depGraphNavigationDataElement) {
+    depGraphNavigationData = undefined;
+    return depGraphNavigationData;
+  }
+  try {
+    depGraphNavigationData = JSON.parse(depGraphNavigationDataElement.textContent || 'null');
+  } catch (error) {
+    console.warn('Dependency graph navigation payload could not be parsed.', error);
+    depGraphNavigationData = undefined;
+  }
+  return depGraphNavigationData;
+}
+
+function dotQuote(value) {
+  return JSON.stringify(String(value));
+}
+
+function graphvizObjectId(kind, rawValue) {
+  const value = String(rawValue == null ? '' : rawValue);
+  const encoded = btoa(unescape(encodeURIComponent(value)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+  return `depgraph-${kind}-${encoded || 'AA'}`;
+}
+
+function graphvizObjectValue(prefix, encodedValue) {
+  if (!encodedValue || !encodedValue.startsWith(prefix)) {
+    return '';
+  }
+  const payload = encodedValue.slice(prefix.length);
+  const normalized = payload
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(payload.length / 4) * 4, '=');
+  try {
+    return decodeURIComponent(escape(atob(normalized)));
+  } catch (error) {
+    return '';
+  }
+}
+
+function graphSvgElement() {
+  return Array.from(graphRenderElement.children).find(function(child) {
+    return child instanceof SVGSVGElement;
+  }) || null;
+}
+
+function graphSceneGroup() {
+  const svg = graphSvgElement();
+  if (!svg) {
+    return null;
+  }
+
+  return svg.querySelector('g.graph') || svg.querySelector('g');
+}
+
+function graphOverlayScene() {
+  return graphOverlaySceneElement;
+}
+
+function ensureEdgeHitboxLayer() {
+  return graphOverlayScene().querySelector('.depgraph-edge-hitbox-layer');
+}
+
+function ensureCollapsedBadgeLayer() {
+  return graphOverlayScene().querySelector('.depgraph-collapsed-badge-layer');
+}
+
+function formatCollapsedBadgeCount(value) {
+  if (value == null || value === '') {
+    return '';
+  }
+
+  const stringValue = String(value).trim();
+  const numericValue = Number(stringValue);
+  if (stringValue !== '' && Number.isFinite(numericValue)) {
+    if (numericValue > 99) {
+      return '99+';
+    }
+    return String(Math.max(0, Math.trunc(numericValue)));
+  }
+
+  return stringValue;
+}
+
+function collapsedBadgeId(descriptor, index) {
+  if (descriptor && descriptor.id != null) {
+    return String(descriptor.id);
+  }
+
+  const source = descriptor && descriptor.source ? descriptor.source : 'edge';
+  const target = descriptor && descriptor.target ? descriptor.target : 'badge';
+  return `${source}->${target}:${index}`;
+}
+
+function resolveCollapsedBadgeEdge(descriptor) {
+  if (!depGraphState || !depGraphState.edges) {
+    return null;
+  }
+
+  if (descriptor.edgeId && depGraphState.edges.has(descriptor.edgeId)) {
+    return depGraphState.edges.get(descriptor.edgeId);
+  }
+
+  const matches = [];
+  depGraphState.edges.forEach(function(edge) {
+    if (descriptor.source && edge.source !== descriptor.source) {
+      return;
+    }
+    if (descriptor.target && edge.target !== descriptor.target) {
+      return;
+    }
+    matches.push(edge);
+  });
+
+  const occurrence = Number.isInteger(descriptor.index) ? descriptor.index : 0;
+  return matches[Math.max(0, occurrence)] || null;
+}
+
+function pointOnPathInLayerSpace(path, distance, layer) {
+  if (!path || typeof path.getPointAtLength !== 'function') {
+    return null;
+  }
+
+  const svg = path.ownerSVGElement;
+  if (!svg || typeof svg.createSVGPoint !== 'function') {
+    const point = path.getPointAtLength(distance);
+    return { x: point.x, y: point.y };
+  }
+
+  const rawPoint = path.getPointAtLength(distance);
+  const svgPoint = svg.createSVGPoint();
+  svgPoint.x = rawPoint.x;
+  svgPoint.y = rawPoint.y;
+
+  const pathMatrix = path.getCTM();
+  const layerMatrix = layer && typeof layer.getCTM === 'function' ? layer.getCTM() : null;
+  if (!pathMatrix || !layerMatrix || typeof layerMatrix.inverse !== 'function') {
+    return { x: rawPoint.x, y: rawPoint.y };
+  }
+
+  try {
+    const viewportPoint = svgPoint.matrixTransform(pathMatrix);
+    const layerPoint = viewportPoint.matrixTransform(layerMatrix.inverse());
+    return { x: layerPoint.x, y: layerPoint.y };
+  } catch (error) {
+    return { x: rawPoint.x, y: rawPoint.y };
+  }
+}
+
+function resolveCollapsedBadgeAnchor(descriptor, layer) {
+  if (descriptor.position) {
+    const x = Number(descriptor.position.x);
+    const y = Number(descriptor.position.y);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      return { x: x, y: y, edge: resolveCollapsedBadgeEdge(descriptor) };
+    }
+  }
+
+  const edge = resolveCollapsedBadgeEdge(descriptor);
+  if (!edge) {
+    return null;
+  }
+
+  const path = edge.element.querySelector('path');
+  if (!path || typeof path.getTotalLength !== 'function') {
+    return null;
+  }
+
+  const totalLength = path.getTotalLength();
+  const ratio = typeof descriptor.at === 'number'
+    ? Math.min(1, Math.max(0, descriptor.at))
+    : 0.5;
+  const point = pointOnPathInLayerSpace(path, totalLength * ratio, layer);
+  if (!point) {
+    return null;
+  }
+
+  return {
+    x: point.x,
+    y: point.y,
+    edge: edge,
+  };
+}
+
+function syncCollapsedBadgeState(badgeElement, edge) {
+  const hasFocus = Boolean(depGraphState && currentEmphasisState());
+  const isMuted = Boolean(hasFocus && edge && edge.element.classList.contains('depgraph-focus-muted'));
+  const isActive = Boolean(hasFocus && edge && edge.element.classList.contains('depgraph-focus-active'));
+  badgeElement.classList.toggle('depgraph-focus-muted', isMuted);
+  badgeElement.classList.toggle('depgraph-focus-active', isActive);
+}
+
+function dispatchCollapsedBadgeClick(descriptor, edge, badgeElement) {
+  const detail = {
+    badge: descriptor,
+    edgeId: edge ? edge.id : descriptor.edgeId || null,
+    source: edge ? edge.source : descriptor.source || null,
+    target: edge ? edge.target : descriptor.target || null,
+    element: badgeElement,
+  };
+
+  graphElement.dispatchEvent(new CustomEvent('depgraph:collapsed-edge-click', {
+    bubbles: true,
+    detail: detail,
+  }));
+
+  if (typeof depGraphCollapsedBadgeClick === 'function') {
+    depGraphCollapsedBadgeClick(detail);
+  }
+}
+
+function buildCollapsedBadgeElement(descriptor, index, layer) {
+  const anchor = resolveCollapsedBadgeAnchor(descriptor, layer);
+  const countLabel = formatCollapsedBadgeCount(
+    descriptor.label != null ? descriptor.label : descriptor.count
+  );
+  if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y) || !countLabel) {
+    return null;
+  }
+
+  const badge = document.createElementNS(depGraphSvgNs, 'g');
+  badge.setAttribute('class', 'depgraph-collapsed-badge');
+  badge.setAttribute('transform', `translate(${anchor.x} ${anchor.y})`);
+  badge.setAttribute('tabindex', '0');
+  badge.setAttribute('role', 'button');
+  badge.dataset.badgeId = collapsedBadgeId(descriptor, index);
+  if (anchor.edge) {
+    badge.dataset.edgeId = anchor.edge.id;
+  }
+
+  if (descriptor.className) {
+    String(descriptor.className).split(/\s+/).filter(Boolean).forEach(function(className) {
+      badge.classList.add(className);
+    });
+  }
+
+  const radius = countLabel.length >= 3 ? 15 : 13;
+  const hitRadius = radius + 8;
+
+  const hitArea = document.createElementNS(depGraphSvgNs, 'circle');
+  hitArea.setAttribute('class', 'depgraph-collapsed-badge__hitarea');
+  hitArea.setAttribute('r', String(hitRadius));
+  badge.appendChild(hitArea);
+
+  const halo = document.createElementNS(depGraphSvgNs, 'circle');
+  halo.setAttribute('class', 'depgraph-collapsed-badge__halo');
+  halo.setAttribute('r', String(radius + 2.5));
+  badge.appendChild(halo);
+
+  const shell = document.createElementNS(depGraphSvgNs, 'circle');
+  shell.setAttribute('class', 'depgraph-collapsed-badge__shell');
+  shell.setAttribute('r', String(radius));
+  badge.appendChild(shell);
+
+  const label = document.createElementNS(depGraphSvgNs, 'text');
+  label.setAttribute('class', 'depgraph-collapsed-badge__count');
+  label.setAttribute('x', '0');
+  label.setAttribute('y', '0');
+  label.textContent = countLabel;
+  badge.appendChild(label);
+
+  const title = document.createElementNS(depGraphSvgNs, 'title');
+  title.textContent = descriptor.title || `Expand ${countLabel} hidden result${countLabel === '1' ? '' : 's'}`;
+  badge.appendChild(title);
+
+  badge.setAttribute('aria-label', title.textContent);
+  badge.addEventListener('pointerdown', function(event) {
+    event.stopPropagation();
+  });
+  badge.addEventListener('click', function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    dispatchCollapsedBadgeClick(descriptor, anchor.edge, badge);
+  });
+  badge.addEventListener('keydown', function(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    dispatchCollapsedBadgeClick(descriptor, anchor.edge, badge);
+  });
+
+  syncCollapsedBadgeState(badge, anchor.edge);
+  return badge;
+}
+
+function renderCollapsedEdgeBadges() {
+  const layer = ensureCollapsedBadgeLayer();
+  if (!layer) {
+    return;
+  }
+
+  layer.replaceChildren();
+  depGraphCollapsedBadgeItems.forEach(function(descriptor, index) {
+    const badge = buildCollapsedBadgeElement(descriptor, index, layer);
+    if (badge) {
+      layer.appendChild(badge);
+    }
+  });
+}
+
+function syncCollapsedBadgeStates() {
+  const layer = ensureCollapsedBadgeLayer();
+  if (!layer || !depGraphState || !depGraphState.edges) {
+    return;
+  }
+
+  layer.querySelectorAll('.depgraph-collapsed-badge').forEach(function(badgeElement) {
+    const edgeId = badgeElement.dataset.edgeId;
+    const edge = edgeId ? depGraphState.edges.get(edgeId) : null;
+    syncCollapsedBadgeState(badgeElement, edge || null);
+  });
+}
+
+function setCollapsedEdgeBadges(badges, options) {
+  depGraphCollapsedBadgeItems = Array.isArray(badges) ? badges.filter(Boolean) : [];
+  if (options && Object.prototype.hasOwnProperty.call(options, 'onClick')) {
+    depGraphCollapsedBadgeClick = typeof options.onClick === 'function' ? options.onClick : null;
+  }
+  renderCollapsedEdgeBadges();
+}
+
+function clearCollapsedEdgeBadges() {
+  depGraphCollapsedBadgeItems = [];
+  depGraphCollapsedBadgeClick = null;
+  renderCollapsedEdgeBadges();
+}
+
+function renderEdgeHitboxes() {
+  const layer = ensureEdgeHitboxLayer();
+  if (!layer || !depGraphState) {
+    return;
+  }
+
+  layer.replaceChildren();
+  depGraphState.edges.forEach(function(edge) {
+    const edgePath = edge.element.querySelector('path');
+    if (!edgePath) {
+      return;
+    }
+    const hitbox = document.createElementNS(depGraphSvgNs, 'path');
+    hitbox.setAttribute('class', 'depgraph-edge-hitbox');
+    hitbox.setAttribute('d', edgePath.getAttribute('d') || '');
+    hitbox.dataset.edgeId = edge.id;
+    layer.appendChild(hitbox);
+  });
+}
+
+function syncEdgeHitboxPresentation(visibleNodeIds) {
+  const layer = ensureEdgeHitboxLayer();
+  if (!layer || !depGraphState) {
+    return;
+  }
+
+  layer.querySelectorAll('.depgraph-edge-hitbox').forEach(function(hitboxElement) {
+    const edgeId = hitboxElement.dataset.edgeId;
+    const edge = edgeId ? depGraphState.edges.get(edgeId) : null;
+    const hidden = !edge || !visibleNodeIds.has(edge.source) || !visibleNodeIds.has(edge.target);
+    hitboxElement.classList.toggle('depgraph-view-hidden', hidden);
+  });
+}
+
+window.depGraphCollapsedBadges = {
+  set: setCollapsedEdgeBadges,
+  clear: clearCollapsedEdgeBadges,
+  refresh: renderCollapsedEdgeBadges,
+  items: function() {
+    return depGraphCollapsedBadgeItems.slice();
+  },
+};
+
+function sanitizeTooltipFragment(node) {
+  const fragment = node.cloneNode(true);
+  fragment.removeAttribute('id');
+  fragment.removeAttribute('style');
+  fragment.querySelectorAll('[id]').forEach(function(element) {
+    element.removeAttribute('id');
+  });
+  fragment.querySelectorAll('script[type^="math/tex"]').forEach(function(script) {
+    script.textContent = script.textContent.replace(/\\label\s*\{[^}]*\}/g, '');
+  });
+  return fragment;
+}
+
+function sanitizeTooltipHtml(html) {
+  return (html || '').replace(/\\label\s*\{[^}]*\}/g, '');
+}
+
+function buildTooltipContent(tagName, className, html) {
+  const element = document.createElement(tagName);
+  element.className = className;
+  element.innerHTML = sanitizeTooltipHtml(html);
+  element.querySelectorAll('[id]').forEach(function(node) {
+    node.removeAttribute('id');
+  });
+  element.querySelectorAll('[style]').forEach(function(node) {
+    node.removeAttribute('style');
+  });
+  return element;
+}
+
+function captureTheoremSources() {
+  document.querySelectorAll('#statements .thm').forEach(function(theorem) {
+    const heading = theorem.querySelector('.thm_thmheading');
+    const statement = theorem.querySelector('.thm_thmcontent');
+    if (heading && !theorem.dataset.depgraphHeadingHtml) {
+      theorem.dataset.depgraphHeadingHtml = heading.innerHTML;
+    }
+    if (statement && !theorem.dataset.depgraphStatementHtml) {
+      theorem.dataset.depgraphStatementHtml = statement.innerHTML;
+    }
+  });
+}
+
+function theoremContent(nodeId) {
+  const theorem = document.getElementById(nodeId);
+  if (!theorem) {
+    return null;
+  }
+
+  return {
+    headingSource: theorem.dataset.depgraphHeadingHtml || '',
+    statementSource: theorem.dataset.depgraphStatementHtml || '',
+    actions: Array.from(theorem.children).filter(function(child) {
+      return child.matches('a, .tooltip');
+    }),
+  };
+}
+
+function ensureTooltip() {
+  if (depGraphTooltip) {
+    return depGraphTooltip;
+  }
+
+  depGraphTooltip = document.createElement('div');
+  depGraphTooltip.className = 'depgraph-focus-tooltip';
+  depGraphTooltip.hidden = true;
+  depGraphTooltip.addEventListener('click', function(event) {
+    event.stopPropagation();
+  });
+  depGraphTooltip.addEventListener('scroll', schedulePinnedTooltipSync, { passive: true });
+  graphUiElement.appendChild(depGraphTooltip);
+  return depGraphTooltip;
+}
+
+function ensureHoverTooltip() {
+  if (depGraphHoverTooltip) {
+    return depGraphHoverTooltip;
+  }
+
+  depGraphHoverTooltip = document.createElement('div');
+  depGraphHoverTooltip.className = 'depgraph-focus-tooltip';
+  depGraphHoverTooltip.hidden = true;
+  graphUiElement.appendChild(depGraphHoverTooltip);
+  return depGraphHoverTooltip;
+}
+
+function ensureActionMenu() {
+  if (depGraphActionMenu) {
+    return depGraphActionMenu;
+  }
+
+  depGraphActionMenu = document.createElement('div');
+  depGraphActionMenu.className = 'depgraph-focus-action-menu';
+  depGraphActionMenu.hidden = true;
+  depGraphActionMenu.addEventListener('click', function(event) {
+    event.stopPropagation();
+  });
+  graphUiElement.appendChild(depGraphActionMenu);
+  return depGraphActionMenu;
+}
+
+function hideActionMenu() {
+  const menu = ensureActionMenu();
+  menu.hidden = true;
+  menu.replaceChildren();
+  if (depGraphActionMenuTrigger) {
+    depGraphActionMenuTrigger.classList.remove('depgraph-focus-tooltip__menu-trigger--open');
+  }
+  depGraphActionMenuTrigger = null;
+}
+
+function hideTooltip() {
+  const tooltip = ensureTooltip();
+  const hoverTooltip = ensureHoverTooltip();
+  hideActionMenu();
+  tooltip.hidden = true;
+  tooltip.replaceChildren();
+  hoverTooltip.hidden = true;
+  hoverTooltip.dataset.mode = 'hidden';
+  hoverTooltip.dataset.nodeId = '';
+  hoverTooltip.replaceChildren();
+}
+
+function hideHoverTooltip() {
+  const hoverTooltip = ensureHoverTooltip();
+  hoverTooltip.hidden = true;
+  hoverTooltip.dataset.mode = 'hidden';
+  hoverTooltip.dataset.nodeId = '';
+  hoverTooltip.replaceChildren();
+}
+
+function setHoveredNode(nodeId) {
+  const nextNodeId = nodeId || '';
+  if (depGraphState.hoveredNodeId === nextNodeId) {
+    return;
+  }
+  depGraphState.hoveredNodeId = nextNodeId;
+  refreshGraphPresentation();
+}
+
+function fallbackTooltipPosition(tooltip) {
+  const margin = 16;
+  return {
+    left: Math.max(margin, graphElement.clientWidth - tooltip.offsetWidth - margin),
+    top: margin,
+  };
+}
+
+function positionPinnedTooltip() {
+  const tooltip = ensureTooltip();
+  const fixed = fallbackTooltipPosition(tooltip);
+  tooltip.style.left = `${Math.round(fixed.left)}px`;
+  tooltip.style.top = `${Math.round(fixed.top)}px`;
+}
+
+function positionHoverTooltip(event) {
+  const tooltip = ensureHoverTooltip();
+  const margin = 18;
+  const containerRect = graphElement.getBoundingClientRect();
+  const left = Math.min(
+    Math.max(event.clientX - containerRect.left + 18, margin),
+    Math.max(margin, graphElement.clientWidth - tooltip.offsetWidth - margin),
+  );
+  const top = Math.min(
+    Math.max(event.clientY - containerRect.top + 18, margin),
+    Math.max(margin, graphElement.clientHeight - tooltip.offsetHeight - margin),
+  );
+
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function schedulePinnedTooltipSync() {
+  if ((!depGraphPinnedNode && ensureActionMenu().hidden) || depGraphSyncFrame) {
+    return;
+  }
+
+  depGraphSyncFrame = window.requestAnimationFrame(function() {
+    depGraphSyncFrame = 0;
+    if (depGraphPinnedNode && !ensureTooltip().hidden) {
+      positionPinnedTooltip();
+    }
+    if (!ensureActionMenu().hidden && depGraphActionMenuTrigger) {
+      positionActionMenu(depGraphActionMenuTrigger);
+    }
+  });
+}
+
+function positionActionMenu(triggerElement) {
+  const menu = ensureActionMenu();
+  if (menu.hidden || !triggerElement) {
+    return;
+  }
+
+  const containerRect = graphElement.getBoundingClientRect();
+  const triggerRect = triggerElement.getBoundingClientRect();
+  const margin = 12;
+  const gap = 8;
+
+  const candidates = [
+    {
+      left: triggerRect.left - containerRect.left,
+      top: triggerRect.bottom - containerRect.top + gap,
+    },
+    {
+      left: triggerRect.left - containerRect.left,
+      top: triggerRect.top - containerRect.top - menu.offsetHeight - gap,
+    },
+    {
+      left: triggerRect.right - containerRect.left - menu.offsetWidth,
+      top: triggerRect.bottom - containerRect.top + gap,
+    },
+    {
+      left: triggerRect.right - containerRect.left - menu.offsetWidth,
+      top: triggerRect.top - containerRect.top - menu.offsetHeight - gap,
+    },
+  ];
+
+  const chosen = candidates.find(function(candidate) {
+    return (
+      candidate.left >= margin &&
+      candidate.top >= margin &&
+      candidate.left + menu.offsetWidth <= graphElement.clientWidth - margin &&
+      candidate.top + menu.offsetHeight <= graphElement.clientHeight - margin
+    );
+  }) || {
+    left: Math.min(
+      Math.max(triggerRect.left - containerRect.left, margin),
+      Math.max(margin, graphElement.clientWidth - menu.offsetWidth - margin),
+    ),
+    top: Math.min(
+      Math.max(triggerRect.bottom - containerRect.top + gap, margin),
+      Math.max(margin, graphElement.clientHeight - menu.offsetHeight - margin),
+    ),
+  };
+
+  menu.style.left = `${Math.round(chosen.left)}px`;
+  menu.style.top = `${Math.round(chosen.top)}px`;
+}
+
+function buildActionMenu(sourceTooltip, triggerElement) {
+  const links = Array.from(sourceTooltip.querySelectorAll('.tooltip_list a'));
+  if (!links.length) {
+    hideActionMenu();
+    return;
+  }
+
+  const menu = ensureActionMenu();
+  const list = document.createElement('ul');
+  list.className = 'depgraph-focus-action-menu__list';
+
+  links.forEach(function(link) {
+    const item = document.createElement('li');
+    item.appendChild(sanitizeTooltipFragment(link));
+    list.appendChild(item);
+  });
+
+  if (depGraphActionMenuTrigger && depGraphActionMenuTrigger !== triggerElement) {
+    depGraphActionMenuTrigger.classList.remove('depgraph-focus-tooltip__menu-trigger--open');
+  }
+
+  menu.replaceChildren(list);
+  menu.hidden = false;
+  depGraphActionMenuTrigger = triggerElement;
+  depGraphActionMenuTrigger.classList.add('depgraph-focus-tooltip__menu-trigger--open');
+  positionActionMenu(triggerElement);
+}
+
+function buildTooltipAction(action) {
+  if (action.matches('a')) {
+    return sanitizeTooltipFragment(action);
+  }
+
+  if (action.matches('.tooltip')) {
+    const label = action.querySelector('.lean_link, .issue_link, .latex_link, span, a');
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'depgraph-focus-tooltip__menu-trigger';
+    trigger.textContent = label ? label.textContent.trim() : 'Links';
+    trigger.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!ensureActionMenu().hidden && depGraphActionMenuTrigger === trigger) {
+        hideActionMenu();
+        return;
+      }
+      buildActionMenu(action, trigger);
+    });
+    return trigger;
+  }
+
+  return sanitizeTooltipFragment(action);
+}
+
+function positionTooltipForMode(options) {
+  if (options.mode === 'pinned') {
+    positionPinnedTooltip();
+  } else if (options.hoverPoint) {
+    positionHoverTooltip(options.hoverPoint);
+  }
+}
+
+function queueTooltipTypeset(nodeId, options) {
+  const tooltip = options.mode === 'pinned' ? ensureTooltip() : ensureHoverTooltip();
+  if (!window.MathJax) {
+    positionTooltipForMode(options);
+    return;
+  }
+
+  if (window.MathJax.Hub && typeof window.MathJax.Hub.Queue === 'function') {
+    window.MathJax.Hub.Queue(
+      ['Typeset', window.MathJax.Hub, tooltip],
+      function() {
+        if (tooltip.hidden || tooltip.dataset.nodeId !== nodeId) {
+          return;
+        }
+        positionTooltipForMode(options);
+      }
+    );
+    return;
+  }
+
+  if (typeof window.MathJax.typesetPromise === 'function') {
+    window.MathJax.typesetPromise([tooltip]).then(function() {
+      if (tooltip.hidden || tooltip.dataset.nodeId !== nodeId) {
+        return;
+      }
+      positionTooltipForMode(options);
+    }).catch(function() {
+      positionTooltipForMode(options);
+    });
+    return;
+  }
+
+  positionTooltipForMode(options);
+}
+
+function showTooltip(nodeId, options) {
+  const tooltip = options.mode === 'pinned' ? ensureTooltip() : ensureHoverTooltip();
+  const content = theoremContent(nodeId);
+  const tooltipOptions = Object.assign({}, options, {
+    hoverPoint: options && options.event ? {
+      clientX: options.event.clientX,
+      clientY: options.event.clientY,
+    } : null,
+  });
+  if (tooltipOptions.mode === 'pinned') {
+    hideActionMenu();
+  }
+  tooltip.hidden = false;
+  tooltip.dataset.nodeId = nodeId;
+  tooltip.dataset.mode = tooltipOptions.mode;
+  tooltip.classList.toggle('depgraph-focus-tooltip--pinned', tooltipOptions.mode === 'pinned');
+  tooltip.scrollTop = 0;
+  tooltip.scrollLeft = 0;
+  tooltip.replaceChildren();
+
+  const card = document.createElement('div');
+  card.className = 'depgraph-focus-tooltip__card';
+
+  const header = document.createElement('div');
+  header.className = 'depgraph-focus-tooltip__header';
+
+  const heading = content && content.headingSource
+    ? buildTooltipContent('div', 'depgraph-focus-tooltip__heading thm_thmheading', content.headingSource)
+    : document.createElement('div');
+  if (!content || !content.headingSource) {
+    heading.className = 'depgraph-focus-tooltip__heading thm_thmheading';
+    heading.textContent = nodeId;
+  }
+  header.appendChild(heading);
+
+  if (tooltipOptions.mode === 'pinned') {
+    const closeButton = document.createElement('button');
+    closeButton.className = 'depgraph-focus-tooltip__close';
+    closeButton.type = 'button';
+    closeButton.setAttribute('aria-label', 'Close node details');
+    closeButton.innerHTML = depGraphCloseIcon;
+    closeButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearFocus();
+    });
+    header.appendChild(closeButton);
+  }
+
+  card.appendChild(header);
+
+  if (content && content.statementSource) {
+    const statement = buildTooltipContent('div', 'thm_thmcontent depgraph-focus-tooltip__statement', content.statementSource);
+    card.appendChild(statement);
+  }
+
+  if (tooltipOptions.mode === 'pinned' && content && content.actions.length) {
+    const actions = document.createElement('div');
+    actions.className = 'depgraph-focus-tooltip__actions';
+    content.actions.forEach(function(action) {
+      actions.appendChild(buildTooltipAction(action));
+    });
+    card.appendChild(actions);
+  }
+
+  tooltip.appendChild(card);
+
+  window.requestAnimationFrame(function() {
+    positionTooltipForMode(tooltipOptions);
+    queueTooltipTypeset(nodeId, tooltipOptions);
+  });
+}
+
+function moveHoverTooltip(event) {
+  const tooltip = ensureHoverTooltip();
+  if (tooltip.hidden || tooltip.dataset.mode !== 'hover') {
+    return;
+  }
+  positionHoverTooltip(event);
+}
+
+function buildNavigationModel() {
+  const payload = navigationPayload();
+  if (payload && Array.isArray(payload.primarySectionIds) && Array.isArray(payload.sections)) {
+    const nodeById = new Map((payload.nodes || []).map(function(node) {
+      return [node.id, node];
+    }));
+    const sectionsById = new Map(payload.sections.map(function(section) {
+      return [section.id, Object.assign({}, section, {
+        nodeIds: new Set(section.nodeIds || []),
+      })];
+    }));
+    const topById = new Map();
+    const topGroups = payload.primarySectionIds.map(function(sectionId) {
+      const record = sectionsById.get(sectionId);
+      if (!record) {
+        return null;
+      }
+
+      const group = {
+        id: record.id,
+        kind: record.type || '',
+        label: record.fullTitle || record.label || record.title || record.id,
+        title: record.title || record.label || record.id,
+        ref: record.ref || '',
+        sortKey: record.url || record.id,
+        nodeIds: new Set(record.nodeIds || []),
+        children: [],
+        childrenById: new Map(),
+      };
+      const childIds = payload.secondarySectionIdsByParent
+        && payload.secondarySectionIdsByParent[record.id]
+        ? payload.secondarySectionIdsByParent[record.id]
+        : [];
+      childIds.forEach(function(childId) {
+        const childRecord = sectionsById.get(childId);
+        if (!childRecord) {
+          return;
+        }
+        const childGroup = {
+          id: childRecord.id,
+          kind: childRecord.type || '',
+          label: childRecord.fullTitle || childRecord.label || childRecord.title || childRecord.id,
+          title: childRecord.title || childRecord.label || childRecord.id,
+          ref: childRecord.ref || '',
+          sortKey: childRecord.url || childRecord.id,
+          nodeIds: new Set(childRecord.nodeIds || []),
+        };
+        group.childrenById.set(childId, childGroup);
+      });
+      group.children = childIds.map(function(childId) {
+        return group.childrenById.get(childId);
+      }).filter(Boolean);
+      topById.set(group.id, group);
+      return group;
+    }).filter(Boolean);
+
+    return {
+      payload: payload,
+      nodeById: nodeById,
+      sectionsById: sectionsById,
+      topGroups: topGroups,
+      topById: topById,
+    };
+  }
+  return {
+    payload: null,
+    nodeById: new Map(),
+    sectionsById: new Map(),
+    topGroups: [],
+    topById: new Map(),
+  };
+}
+
+function visibleGraphKey(visibleNodeIds) {
+  return Array.from(visibleNodeIds).sort().join('\u001f');
+}
+
+function canRenderVisibleDot() {
+  return Boolean(
+    depGraphSidebarState
+    && depGraphSidebarState.payload
+    && Array.isArray(depGraphSidebarState.payload.nodes)
+    && Array.isArray(depGraphSidebarState.payload.displayEdges)
+  );
+}
+
+function syncOverlayViewport() {
+  const liveSvg = graphSvgElement();
+  const liveScene = graphSceneGroup();
+  if (!liveSvg || !liveScene) {
+    graphOverlayElement.setAttribute('viewBox', '0 0 1 1');
+    graphOverlayScene().removeAttribute('transform');
+    return;
+  }
+
+  ['viewBox', 'preserveAspectRatio', 'width', 'height'].forEach(function(attribute) {
+    const value = liveSvg.getAttribute(attribute);
+    if (value == null || value === '') {
+      graphOverlayElement.removeAttribute(attribute);
+      return;
+    }
+    graphOverlayElement.setAttribute(attribute, value);
+  });
+  const transform = liveScene.getAttribute('transform');
+  if (transform) {
+    graphOverlayScene().setAttribute('transform', transform);
+  } else {
+    graphOverlayScene().removeAttribute('transform');
+  }
+}
+
+function bindOverlayZoomSync() {
+  if (depGraphZoomSyncBound || typeof graphviz.zoomBehavior !== 'function') {
+    return;
+  }
+  const zoomBehavior = graphviz.zoomBehavior();
+  if (!zoomBehavior) {
+    return;
+  }
+  zoomBehavior.on('zoom.depgraph-overlay-sync', function() {
+    syncOverlayViewport();
+  });
+  depGraphZoomSyncBound = true;
+}
+
+function cleanupGraphvizSceneForRerender() {
+  ensureEdgeHitboxLayer().replaceChildren();
+  ensureCollapsedSummaryLayer().replaceChildren();
+  ensureCollapsedBadgeLayer().replaceChildren();
+  depGraphCollapsedBadgeItems = [];
+  depGraphCollapsedBadgeClick = null;
+}
+
+function buildVisibleDot(visibleNodeIds) {
+  const payload = depGraphSidebarState.payload;
+  const lines = [
+    'strict digraph "" {',
+    `graph [bgcolor=transparent, id=${dotQuote(graphvizObjectId('graph', 'root'))}];`,
+    'node [label="\\N", penwidth=1.8];',
+    'edge [arrowhead=vee];',
+  ];
+
+  (payload.nodes || []).forEach(function(node) {
+    if (!visibleNodeIds.has(node.id)) {
+      return;
+    }
+    const attrs = [
+      `label=${dotQuote(node.label || node.id.split(':').slice(-1)[0])}`,
+      `shape=${dotQuote(node.shape || 'ellipse')}`,
+    ];
+    if (node.style) {
+      attrs.push(`style=${dotQuote(node.style)}`);
+    }
+    if (node.color) {
+      attrs.push(`color=${dotQuote(node.color)}`);
+    }
+    if (node.fillcolor) {
+      attrs.push(`fillcolor=${dotQuote(node.fillcolor)}`);
+    }
+    attrs.push(`id=${dotQuote(graphvizObjectId('node', node.id))}`);
+    lines.push(`  ${dotQuote(node.id)} [${attrs.join(', ')}];`);
+  });
+
+  (payload.displayEdges || []).forEach(function(edge, index) {
+    if (!visibleNodeIds.has(edge.source) || !visibleNodeIds.has(edge.target)) {
+      return;
+    }
+    const attrs = [
+      `id=${dotQuote(graphvizObjectId('edge', edge.id || `${edge.source}->${edge.target}:${index}`))}`,
+    ];
+    if (edge.kind === 'dependency') {
+      attrs.push('style=dashed');
+    }
+    lines.push(`  ${dotQuote(edge.source)} -> ${dotQuote(edge.target)} [${attrs.join(', ')}];`);
+  });
+
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function requestVisibleGraphLayout(visibleNodeIds) {
+  if (!canRenderVisibleDot()) {
+    return false;
+  }
+
+  const graphKey = visibleGraphKey(visibleNodeIds);
+  if (graphKey === depGraphRenderedGraphKey || graphKey === depGraphRenderingGraphKey) {
+    return false;
+  }
+
+  depGraphRenderingGraphKey = graphKey;
+  setRelayoutAnimating(true);
+  hideHoverTooltip();
+  hideTooltip();
+  cleanupGraphvizSceneForRerender();
+  graphviz
+      .transition(depGraphRelayoutTransitionFactory)
+      .width(Math.max(graphElement.clientWidth, 1))
+      .height(Math.max(graphElement.clientHeight, 1))
+      .fit(true)
+      .renderDot(buildVisibleDot(visibleNodeIds));
+  return true;
+}
+
+function serializeNavigationGroup(group, topId) {
+  if (!group) {
+    return null;
+  }
+
+  const isChild = Boolean(topId);
+  const groupTopId = isChild ? topId : group.id;
+  return {
+    id: group.id,
+    topId: groupTopId,
+    childId: isChild ? group.id : '',
+    kind: group.kind || '',
+    label: group.label || '',
+    title: group.title || group.label || '',
+    ref: group.ref || '',
+    nodeIds: Array.from(group.nodeIds || []),
+    children: (group.children || []).map(function(child) {
+      return serializeNavigationGroup(child, groupTopId);
+    }),
+  };
+}
+
+function navigationGroup(topId, childId) {
+  if (!depGraphSidebarState || !topId) {
+    return null;
+  }
+
+  const topGroup = depGraphSidebarState.topById.get(topId) || null;
+  if (!topGroup) {
+    return null;
+  }
+  if (!childId) {
+    return topGroup;
+  }
+  return topGroup.childrenById.get(childId) || null;
+}
+
+function navigationSidebarStateDetail() {
+  return {
+    activeTopId: depGraphState ? depGraphState.activeTopId : '',
+    activeChildId: depGraphState ? depGraphState.activeChildId : '',
+    manualFocus: false,
+    focusedNodeIds: depGraphState && depGraphState.currentFocus
+      ? Array.from(depGraphState.currentFocus.selectedNodeIds || [])
+      : [],
+    hoveredGroup: depGraphState && depGraphState.hoveredGroup ? {
+      topId: depGraphState.hoveredGroup.topId,
+      childId: depGraphState.hoveredGroup.childId,
+    } : null,
+  };
+}
+
+function emitNavigationSidebarEvent(type, topId, childId, extraDetail) {
+  const group = navigationGroup(topId, childId);
+  const detail = Object.assign({
+    group: serializeNavigationGroup(group, childId ? topId : ''),
+    state: navigationSidebarStateDetail(),
+  }, extraDetail || {});
+
+  depGraphChapterSidebarEventTarget.dispatchEvent(new CustomEvent(type, {
+    detail: detail,
+  }));
+  graphElement.dispatchEvent(new CustomEvent(`depgraph:${type}`, {
+    detail: detail,
+  }));
+
+  const hooks = window.depGraphChapterSidebarHooks;
+  const handler = hooks && hooks[type];
+  if (typeof handler === 'function') {
+    handler(detail);
+  }
+}
+
+function syncNavigationSidebarItemStates() {
+  depGraphSidebarList.querySelectorAll('.depgraph-sidebar__item').forEach(function(button) {
+    const topId = button.dataset.topId || '';
+    const childId = button.dataset.childId || '';
+    const active = depGraphState.activeTopId
+      ? depGraphState.activeTopId === topId && depGraphState.activeChildId === childId
+      : depGraphState.activeTopId === topId;
+    const preview = Boolean(depGraphState.hoveredGroup)
+      && depGraphState.hoveredGroup.topId === topId
+      && depGraphState.hoveredGroup.childId === childId;
+    button.classList.toggle('depgraph-sidebar__item--active', active);
+    button.classList.toggle('depgraph-sidebar__item--preview', preview);
+  });
+}
+
+function setNavigationPanelOpen(isOpen) {
+  depGraphSidebarRoot.classList.toggle('depgraph-sidebar--closed', !isOpen);
+  if (depGraphNavToggle) {
+    depGraphNavToggle.setAttribute('aria-expanded', String(isOpen));
+    depGraphNavToggle.classList.toggle('depgraph-header-button--active', isOpen);
+  }
+}
+
+function toggleNavigationPanel() {
+  setNavigationPanelOpen(depGraphSidebarRoot.classList.contains('depgraph-sidebar--closed'));
+}
+
+function setLegendOpen(isOpen) {
+  const legendList = document.querySelector('#Legend dl');
+  if (legendList) {
+    legendList.style.display = isOpen ? 'block' : 'none';
+  }
+  if (depGraphLegendToggle) {
+    depGraphLegendToggle.setAttribute('aria-expanded', String(isOpen));
+    depGraphLegendToggle.classList.toggle('depgraph-header-button--active', isOpen);
+  }
+}
+
+function toggleLegend() {
+  const legendList = document.querySelector('#Legend dl');
+  setLegendOpen(!(legendList && legendList.style.display === 'block'));
+}
+
+function nodeIdsForSelection(topId, childId) {
+  const payloadNodeIds = depGraphSidebarState
+    && depGraphSidebarState.payload
+    && Array.isArray(depGraphSidebarState.payload.nodes)
+      ? depGraphSidebarState.payload.nodes.map(function(node) { return node.id; })
+      : null;
+
+  if (!depGraphSidebarState || !topId) {
+    return new Set(payloadNodeIds || depGraphState.nodes.keys());
+  }
+
+  const topGroup = depGraphSidebarState.topById.get(topId);
+  if (!topGroup) {
+    return new Set();
+  }
+  if (!childId) {
+    return new Set(topGroup.nodeIds);
+  }
+
+  const childGroup = topGroup.childrenById.get(childId);
+  return childGroup ? new Set(childGroup.nodeIds) : new Set();
+}
+
+function visibleNodeIdsForCurrentView() {
+  if (!depGraphState || !depGraphState.activeTopId) {
+    return nodeIdsForSelection('', '');
+  }
+  const visible = nodeIdsForSelection(depGraphState.activeTopId, depGraphState.activeChildId);
+  depGraphState.expandedNodeIds.forEach(function(nodeId) {
+    visible.add(nodeId);
+  });
+  return visible;
+}
+
+function summarySeedNodeIds(visibleNodeIds) {
+  return visibleNodeIds;
+}
+
+function edgeIdsForNodeIds(nodeIds) {
+  const edgeIds = new Set();
+  depGraphState.edges.forEach(function(edge, edgeId) {
+    if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+      edgeIds.add(edgeId);
+    }
+  });
+  return edgeIds;
+}
+
+function navigationPreviewState() {
+  if (!depGraphState || !depGraphState.hoveredGroup || !depGraphState.hoveredGroup.topId) {
+    return null;
+  }
+
+  const activeNodes = nodeIdsForSelection(
+    depGraphState.hoveredGroup.topId,
+    depGraphState.hoveredGroup.childId,
+  );
+  return {
+    activeNodes: activeNodes,
+    activeEdges: edgeIdsForNodeIds(activeNodes),
+    selectedNodeIds: new Set(),
+  };
+}
+
+function currentEmphasisState() {
+  return depGraphState.currentFocus || navigationPreviewState();
+}
+
+function currentSummaryInteractionNodeIds() {
+  const interactiveNodeIds = new Set();
+  if (depGraphState && depGraphState.currentFocus && depGraphState.currentFocus.selectedNodeIds.size) {
+    depGraphState.currentFocus.selectedNodeIds.forEach(function(nodeId) {
+      interactiveNodeIds.add(nodeId);
+    });
+  }
+  if (depGraphState && depGraphState.hoveredNodeId) {
+    interactiveNodeIds.add(depGraphState.hoveredNodeId);
+  }
+  return interactiveNodeIds;
+}
+
+function summaryRevealNodeId(summary) {
+  const interactiveNodeIds = currentSummaryInteractionNodeIds();
+  if (!interactiveNodeIds.size || !summary || !summary.visibleNodeIds) {
+    return '';
+  }
+
+  for (const nodeId of summary.visibleNodeIds) {
+    if (interactiveNodeIds.has(nodeId)) {
+      return nodeId;
+    }
+  }
+
+  return '';
+}
+
+function ensureCollapsedSummaryLayer() {
+  return graphOverlayScene().querySelector('.depgraph-collapsed-summary-layer');
+}
+
+function nodeCenter(nodeId) {
+  const cached = depGraphState && depGraphState.nodeCenters
+    ? depGraphState.nodeCenters.get(nodeId)
+    : null;
+  if (cached) {
+    return cached;
+  }
+
+  const fallback = depGraphState && depGraphState.fullNodeCenters
+    ? depGraphState.fullNodeCenters.get(nodeId)
+    : null;
+  if (fallback) {
+    return fallback;
+  }
+
+  const nodeElement = depGraphState.nodes.get(nodeId);
+  if (!nodeElement) {
+    return null;
+  }
+
+  const shape = nodeElement.querySelector('ellipse, polygon, rect, path');
+  const box = (shape || nodeElement).getBBox();
+  const center = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  if (depGraphState && depGraphState.nodeCenters) {
+    depGraphState.nodeCenters.set(nodeId, center);
+  }
+  return center;
+}
+
+function nodeShape(nodeId) {
+  const nodeElement = depGraphState.nodes.get(nodeId);
+  if (!nodeElement) {
+    return null;
+  }
+  return nodeElement.querySelector('ellipse, polygon, rect, path') || nodeElement;
+}
+
+function boundaryPointOnEllipse(shape, towardPoint) {
+  const cx = Number(shape.getAttribute('cx'));
+  const cy = Number(shape.getAttribute('cy'));
+  const rx = Number(shape.getAttribute('rx'));
+  const ry = Number(shape.getAttribute('ry'));
+  if (!(rx > 0) || !(ry > 0)) {
+    return null;
+  }
+
+  const dx = towardPoint.x - cx;
+  const dy = towardPoint.y - cy;
+  if (!dx && !dy) {
+    return { x: cx, y: cy };
+  }
+
+  const scale = 1 / Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry));
+  return {
+    x: cx + dx * scale,
+    y: cy + dy * scale,
+  };
+}
+
+function boundaryPointOnBox(shape, towardPoint) {
+  const box = shape.getBBox();
+  const center = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  const dx = towardPoint.x - center.x;
+  const dy = towardPoint.y - center.y;
+  if (!dx && !dy) {
+    return center;
+  }
+
+  const halfWidth = box.width / 2;
+  const halfHeight = box.height / 2;
+  const scaleX = dx ? halfWidth / Math.abs(dx) : Number.POSITIVE_INFINITY;
+  const scaleY = dy ? halfHeight / Math.abs(dy) : Number.POSITIVE_INFINITY;
+  const scale = Math.min(scaleX, scaleY);
+  return {
+    x: center.x + dx * scale,
+    y: center.y + dy * scale,
+  };
+}
+
+function nodeBoundaryPoint(nodeId, towardPoint) {
+  const shape = nodeShape(nodeId);
+  if (!shape) {
+    return null;
+  }
+
+  if (shape.tagName === 'ellipse') {
+    const point = boundaryPointOnEllipse(shape, towardPoint);
+    if (point) {
+      return point;
+    }
+  }
+
+  return boundaryPointOnBox(shape, towardPoint);
+}
+
+function cubicPoint(start, control1, control2, end, t) {
+  const mt = 1 - t;
+  return {
+    x: (mt ** 3) * start.x
+      + 3 * (mt ** 2) * t * control1.x
+      + 3 * mt * (t ** 2) * control2.x
+      + (t ** 3) * end.x,
+    y: (mt ** 3) * start.y
+      + 3 * (mt ** 2) * t * control1.y
+      + 3 * mt * (t ** 2) * control2.y
+      + (t ** 3) * end.y,
+  };
+}
+
+function syntheticSummaryGeometry(sourceId, targetId) {
+  const sourceCenter = nodeCenter(sourceId);
+  const targetCenter = nodeCenter(targetId);
+  if (!sourceCenter || !targetCenter) {
+    return null;
+  }
+
+  const start = nodeBoundaryPoint(sourceId, targetCenter) || sourceCenter;
+  const end = nodeBoundaryPoint(targetId, sourceCenter) || targetCenter;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const normal = {
+    x: -dy / distance,
+    y: dx / distance,
+  };
+  const bend = Math.max(16, Math.min(44, distance * 0.18));
+  const control1 = {
+    x: start.x + dx * 0.25 + normal.x * bend,
+    y: start.y + dy * 0.25 + normal.y * bend,
+  };
+  const control2 = {
+    x: start.x + dx * 0.75 + normal.x * bend,
+    y: start.y + dy * 0.75 + normal.y * bend,
+  };
+  return {
+    path: `M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`,
+    midpoint: cubicPoint(start, control1, control2, end, 0.5),
+  };
+}
+
+function singleSummaryGeometry(anchorId, hiddenNodeIds, direction) {
+  const startCenter = nodeCenter(anchorId);
+  if (!startCenter) {
+    return null;
+  }
+
+  const target = {
+    x: startCenter.x,
+    y: startCenter.y + (direction === 'incoming' ? -112 : 112),
+  };
+
+  const start = nodeBoundaryPoint(anchorId, target) || startCenter;
+  const dx = target.x - start.x;
+  const dy = target.y - start.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const unit = {
+    x: dx / distance,
+    y: dy / distance,
+  };
+  const endDistance = Math.max(72, Math.min(140, distance * 0.55));
+  const end = {
+    x: start.x + unit.x * endDistance,
+    y: start.y + unit.y * endDistance,
+  };
+  const normal = {
+    x: -unit.y,
+    y: unit.x,
+  };
+  const bend = Math.max(10, Math.min(28, endDistance * 0.18));
+  const control1 = {
+    x: start.x + unit.x * (endDistance * 0.35) + normal.x * bend,
+    y: start.y + unit.y * (endDistance * 0.35) + normal.y * bend,
+  };
+  const control2 = {
+    x: start.x + unit.x * (endDistance * 0.75) + normal.x * bend,
+    y: start.y + unit.y * (endDistance * 0.75) + normal.y * bend,
+  };
+  return {
+    path: `M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`,
+    badgePosition: end,
+  };
+}
+
+function summaryKey(sourceId, targetId) {
+  return `summary:${sourceId}->${targetId}`;
+}
+
+function addCollapsedSummary(summaryById, sourceId, targetId, hiddenNodeIds) {
+  if (!hiddenNodeIds.size) {
+    return;
+  }
+
+  const key = summaryKey(sourceId, targetId);
+  if (!summaryById.has(key)) {
+    const directEdgeIds = depGraphState.edgePairs.get(`${sourceId}->${targetId}`) || [];
+    summaryById.set(key, {
+      id: key,
+      source: sourceId,
+      target: targetId,
+      visibleNodeIds: new Set([sourceId, targetId]),
+      hiddenNodeIds: new Set(),
+      edgeId: directEdgeIds[0] || '',
+    });
+  }
+
+  hiddenNodeIds.forEach(function(nodeId) {
+    summaryById.get(key).hiddenNodeIds.add(nodeId);
+  });
+}
+
+function singleSummaryKey(anchorId, direction) {
+  return `summary:${direction}:${anchorId}`;
+}
+
+function addSingleSummary(summaryById, anchorId, direction, hiddenNodeIds) {
+  if (!hiddenNodeIds.size) {
+    return;
+  }
+
+  const key = singleSummaryKey(anchorId, direction);
+  if (!summaryById.has(key)) {
+    summaryById.set(key, {
+      id: key,
+      anchor: anchorId,
+      direction: direction,
+      visibleNodeIds: new Set([anchorId]),
+      hiddenNodeIds: new Set(),
+      edgeId: '',
+    });
+  }
+
+  hiddenNodeIds.forEach(function(nodeId) {
+    summaryById.get(key).hiddenNodeIds.add(nodeId);
+  });
+}
+
+function collectHiddenBranchNodes(seedId, visibleNodeIds, adjacency, nextNodeKey) {
+  const hiddenNodeIds = new Set();
+  const stack = [];
+  (adjacency.get(seedId) || []).forEach(function(edge) {
+    const nextId = edge[nextNodeKey];
+    if (!visibleNodeIds.has(nextId)) {
+      stack.push(nextId);
+    }
+  });
+
+  while (stack.length > 0) {
+    const currentId = stack.pop();
+    if (hiddenNodeIds.has(currentId)) {
+      continue;
+    }
+    hiddenNodeIds.add(currentId);
+    (adjacency.get(currentId) || []).forEach(function(edge) {
+      const nextId = edge[nextNodeKey];
+      if (!visibleNodeIds.has(nextId) && !hiddenNodeIds.has(nextId)) {
+        stack.push(nextId);
+      }
+    });
+  }
+
+  return hiddenNodeIds;
+}
+
+function exploreCollapsedSummaries(sourceId, visibleNodeIds, summaryById) {
+  function walk(currentId, hiddenNodeIds, visitedNodeIds) {
+    const outgoingEdges = depGraphState.collapsedOutgoing.get(currentId) || [];
+    outgoingEdges.forEach(function(edge) {
+      if (!edge) {
+        return;
+      }
+
+      const nextId = edge.target;
+      if (visibleNodeIds.has(nextId)) {
+        addCollapsedSummary(summaryById, sourceId, nextId, hiddenNodeIds);
+        return;
+      }
+      if (visitedNodeIds.has(nextId)) {
+        return;
+      }
+
+      const nextHiddenNodeIds = new Set(hiddenNodeIds);
+      nextHiddenNodeIds.add(nextId);
+      const nextVisitedNodeIds = new Set(visitedNodeIds);
+      nextVisitedNodeIds.add(nextId);
+      walk(nextId, nextHiddenNodeIds, nextVisitedNodeIds);
+    });
+  }
+
+  walk(sourceId, new Set(), new Set([sourceId]));
+}
+
+function computeCollapsedSummaries(visibleNodeIds) {
+  if (!depGraphState.activeTopId) {
+    return [];
+  }
+
+  const summaryById = new Map();
+  summarySeedNodeIds(visibleNodeIds).forEach(function(sourceId) {
+    exploreCollapsedSummaries(sourceId, visibleNodeIds, summaryById);
+  });
+
+  const bridgedHiddenNodeIds = new Set();
+  summaryById.forEach(function(summary) {
+    summary.hiddenNodeIds.forEach(function(nodeId) {
+      bridgedHiddenNodeIds.add(nodeId);
+    });
+  });
+
+  summarySeedNodeIds(visibleNodeIds).forEach(function(nodeId) {
+    const incomingHiddenNodeIds = collectHiddenBranchNodes(
+      nodeId,
+      visibleNodeIds,
+      depGraphState.collapsedIncoming,
+      'source',
+    );
+    bridgedHiddenNodeIds.forEach(function(hiddenNodeId) {
+      incomingHiddenNodeIds.delete(hiddenNodeId);
+    });
+    addSingleSummary(summaryById, nodeId, 'incoming', incomingHiddenNodeIds);
+
+    const outgoingHiddenNodeIds = collectHiddenBranchNodes(
+      nodeId,
+      visibleNodeIds,
+      depGraphState.collapsedOutgoing,
+      'target',
+    );
+    bridgedHiddenNodeIds.forEach(function(hiddenNodeId) {
+      outgoingHiddenNodeIds.delete(hiddenNodeId);
+    });
+    addSingleSummary(summaryById, nodeId, 'outgoing', outgoingHiddenNodeIds);
+  });
+
+  return Array.from(summaryById.values()).map(function(summary) {
+    summary.count = summary.hiddenNodeIds.size;
+    return summary;
+  }).filter(function(summary) {
+    return summary.count > 0;
+  });
+}
+
+function summaryIsVisible(summary, visibleNodeIds) {
+  return Array.from(summary.visibleNodeIds || []).every(function(nodeId) {
+    return visibleNodeIds.has(nodeId);
+  });
+}
+
+function summaryIsActive(summary, state) {
+  if (!state) {
+    return true;
+  }
+  return Array.from(summary.visibleNodeIds || []).every(function(nodeId) {
+    return state.activeNodes.has(nodeId);
+  });
+}
+
+function syncCollapsedSummaryPresentation(state, visibleNodeIds) {
+  const summaryLayer = ensureCollapsedSummaryLayer();
+  if (summaryLayer) {
+    summaryLayer.querySelectorAll('.depgraph-collapsed-summary').forEach(function(summaryElement) {
+      const summary = depGraphState.collapsedSummaries.get(summaryElement.dataset.summaryId);
+      if (!summary) {
+        summaryElement.classList.add('depgraph-view-hidden');
+        return;
+      }
+      const hidden = !summaryIsVisible(summary, visibleNodeIds) || !summaryRevealNodeId(summary);
+      const active = summaryIsActive(summary, state);
+      summaryElement.classList.toggle('depgraph-view-hidden', hidden);
+      summaryElement.classList.toggle('depgraph-focus-muted', !hidden && Boolean(state) && !active);
+      summaryElement.classList.toggle('depgraph-focus-active', !hidden && Boolean(state) && active);
+    });
+  }
+
+  const badgeLayer = ensureCollapsedBadgeLayer();
+  if (!badgeLayer) {
+    return;
+  }
+
+  badgeLayer.querySelectorAll('.depgraph-collapsed-badge').forEach(function(badgeElement) {
+    const summaryId = badgeElement.dataset.badgeId;
+    const summary = depGraphState.collapsedSummaries.get(summaryId);
+    if (!summary || summary.edgeId) {
+      return;
+    }
+    const hidden = !summaryIsVisible(summary, visibleNodeIds) || !summaryRevealNodeId(summary);
+    const active = summaryIsActive(summary, state);
+    badgeElement.classList.toggle('depgraph-view-hidden', hidden);
+    badgeElement.classList.toggle('depgraph-focus-muted', !hidden && Boolean(state) && !active);
+    badgeElement.classList.toggle('depgraph-focus-active', !hidden && Boolean(state) && active);
+  });
+}
+
+function directExpansionNodeIds(summary, pivotNodeId) {
+  const directNodeIds = new Set();
+  const hiddenNodeIds = summary.hiddenNodeIds || new Set();
+
+  function addIncomingHidden(targetId) {
+    (depGraphState.collapsedIncoming.get(targetId) || []).forEach(function(edge) {
+      if (hiddenNodeIds.has(edge.source)) {
+        directNodeIds.add(edge.source);
+      }
+    });
+  }
+
+  function addOutgoingHidden(sourceId) {
+    (depGraphState.collapsedOutgoing.get(sourceId) || []).forEach(function(edge) {
+      if (hiddenNodeIds.has(edge.target)) {
+        directNodeIds.add(edge.target);
+      }
+    });
+  }
+
+  if (summary.anchor) {
+    if (summary.direction === 'incoming') {
+      addIncomingHidden(summary.anchor);
+    } else {
+      addOutgoingHidden(summary.anchor);
+    }
+  } else if (pivotNodeId) {
+    if (summary.source === pivotNodeId) {
+      addOutgoingHidden(summary.source);
+    }
+    if (summary.target === pivotNodeId) {
+      addIncomingHidden(summary.target);
+    }
+  } else {
+    addOutgoingHidden(summary.source);
+    addIncomingHidden(summary.target);
+  }
+
+  if (!directNodeIds.size) {
+    hiddenNodeIds.forEach(function(nodeId) {
+      directNodeIds.add(nodeId);
+    });
+  }
+
+  return directNodeIds;
+}
+
+function expandCollapsedSummary(summaryId, pivotNodeId) {
+  const summary = depGraphState.collapsedSummaries.get(summaryId);
+  if (!summary) {
+    return;
+  }
+
+  hideHoverTooltip();
+  directExpansionNodeIds(summary, pivotNodeId).forEach(function(nodeId) {
+    depGraphState.expandedNodeIds.add(nodeId);
+  });
+  refreshGraphPresentation();
+}
+
+function renderCollapsedSummaries(visibleNodeIds, state) {
+  const summaryLayer = ensureCollapsedSummaryLayer();
+  if (summaryLayer) {
+    summaryLayer.replaceChildren();
+  }
+
+  if (!depGraphState.activeTopId) {
+    depGraphState.collapsedSummaries = new Map();
+    clearCollapsedEdgeBadges();
+    return;
+  }
+
+  const summaries = computeCollapsedSummaries(visibleNodeIds);
+  depGraphState.collapsedSummaries = new Map();
+  const badges = [];
+
+  summaries.forEach(function(summary) {
+    depGraphState.collapsedSummaries.set(summary.id, summary);
+    if (!summary.edgeId && summaryLayer) {
+      const geometry = summary.anchor
+        ? singleSummaryGeometry(summary.anchor, summary.hiddenNodeIds, summary.direction)
+        : syntheticSummaryGeometry(summary.source, summary.target);
+      if (geometry) {
+        const group = document.createElementNS(depGraphSvgNs, 'g');
+        group.setAttribute('class', 'depgraph-collapsed-summary');
+        group.dataset.summaryId = summary.id;
+
+        const path = document.createElementNS(depGraphSvgNs, 'path');
+        path.setAttribute('class', 'depgraph-collapsed-summary__path');
+        path.setAttribute('d', geometry.path);
+        group.appendChild(path);
+        summaryLayer.appendChild(group);
+        summary.position = summary.anchor ? geometry.badgePosition : geometry.midpoint;
+      }
+    }
+
+    const badge = {
+      id: summary.id,
+      count: summary.count,
+      title: `Expand ${summary.count} hidden result${summary.count === 1 ? '' : 's'}`,
+      pivotNodeId: summaryRevealNodeId(summary),
+    };
+    if (summary.edgeId) {
+      badge.edgeId = summary.edgeId;
+    } else if (summary.position) {
+      badge.position = summary.position;
+    }
+    badges.push(badge);
+  });
+
+  setCollapsedEdgeBadges(badges, {
+    onClick: function(detail) {
+      expandCollapsedSummary(detail.badge.id, detail.badge.pivotNodeId || '');
+    },
+  });
+  syncCollapsedBadgeStates();
+  syncCollapsedSummaryPresentation(state, visibleNodeIds);
+}
+
+function setNavigationHover(topId, childId) {
+  if (!depGraphSidebarState || !topId) {
+    return;
+  }
+
+  const nextChildId = childId || '';
+  if (
+    depGraphState.hoveredGroup
+    && depGraphState.hoveredGroup.topId === topId
+    && depGraphState.hoveredGroup.childId === nextChildId
+  ) {
+    return;
+  }
+
+  depGraphState.hoveredGroup = {
+    topId: topId,
+    childId: nextChildId,
+  };
+  refreshGraphPresentation();
+  syncNavigationSidebarItemStates();
+  emitNavigationSidebarEvent('chapter-hover', topId, nextChildId, {
+    nodeIds: Array.from(nodeIdsForSelection(topId, nextChildId)),
+  });
+}
+
+function clearNavigationHover() {
+  if (!depGraphState.hoveredGroup) {
+    return;
+  }
+  const hovered = depGraphState.hoveredGroup;
+  depGraphState.hoveredGroup = null;
+  refreshGraphPresentation();
+  syncNavigationSidebarItemStates();
+  emitNavigationSidebarEvent('chapter-hover-clear', hovered.topId, hovered.childId, {});
+}
+
+function resetNavigationSelection() {
+  if (depGraphState.activeChildId) {
+    const topId = depGraphState.activeTopId;
+    depGraphState.activeChildId = '';
+    depGraphState.expandedNodeIds.clear();
+    depGraphState.hoveredGroup = null;
+    clearFocus();
+    renderNavigationSidebar();
+    refreshGraphPresentation();
+    emitNavigationSidebarEvent('chapter-back', topId, '', {
+      nodeIds: Array.from(nodeIdsForSelection(topId, '')),
+      view: 'subchapters',
+    });
+    return;
+  }
+
+  if (!depGraphState.activeTopId) {
+    return;
+  }
+
+  depGraphState.activeTopId = '';
+  depGraphState.activeChildId = '';
+  depGraphState.expandedNodeIds.clear();
+  depGraphState.hoveredGroup = null;
+  clearFocus();
+  renderNavigationSidebar();
+  refreshGraphPresentation();
+  emitNavigationSidebarEvent('chapter-back', '', '', {
+    view: 'top',
+  });
+}
+
+function selectChapterGroup(topId) {
+  depGraphState.activeTopId = topId || '';
+  depGraphState.activeChildId = '';
+  depGraphState.expandedNodeIds.clear();
+  depGraphState.hoveredGroup = null;
+  clearFocus();
+  renderNavigationSidebar();
+  refreshGraphPresentation();
+  emitNavigationSidebarEvent('chapter-select', depGraphState.activeTopId, '', {
+    nodeIds: Array.from(nodeIdsForSelection(depGraphState.activeTopId, '')),
+    view: 'subchapters',
+  });
+}
+
+function selectSubchapterGroup(topId, childId) {
+  depGraphState.activeTopId = topId || '';
+  depGraphState.activeChildId = childId || '';
+  depGraphState.expandedNodeIds.clear();
+  depGraphState.hoveredGroup = null;
+  clearFocus();
+  renderNavigationSidebar();
+  refreshGraphPresentation();
+  emitNavigationSidebarEvent('chapter-select', depGraphState.activeTopId, depGraphState.activeChildId, {
+    nodeIds: Array.from(nodeIdsForSelection(depGraphState.activeTopId, depGraphState.activeChildId)),
+    view: 'subchapter',
+  });
+}
+
+function renderNavigationSidebar() {
+  if (!depGraphSidebarState || !depGraphSidebarState.topGroups.length) {
+    depGraphSidebarRoot.hidden = true;
+    depGraphSidebarStatus.hidden = false;
+    depGraphSidebarStatus.textContent = 'Chapter navigation is unavailable for this graph.';
+    depGraphSidebarList.hidden = true;
+    depGraphSidebarList.replaceChildren();
+    depGraphSidebarBackButton.hidden = true;
+    return;
+  }
+
+  depGraphSidebarRoot.hidden = false;
+  depGraphSidebarList.hidden = false;
+  depGraphSidebarStatus.hidden = true;
+  depGraphSidebarStatus.textContent = '';
+  depGraphSidebarList.replaceChildren();
+
+  let items = depGraphSidebarState.topGroups;
+  let activeTop = null;
+  if (depGraphState.activeTopId) {
+    activeTop = depGraphSidebarState.topById.get(depGraphState.activeTopId) || null;
+    items = activeTop ? activeTop.children : [];
+    depGraphSidebarTitle.textContent = activeTop ? activeTop.label : 'Chapters';
+    depGraphSidebarSubtitle.textContent = activeTop && activeTop.children.length
+      ? 'Hover a subchapter to preview it. Click to collapse the graph further.'
+      : 'This chapter has no subchapters in the dependency graph.';
+    depGraphSidebarBackButton.hidden = false;
+  } else {
+    depGraphSidebarTitle.textContent = 'Chapters';
+    depGraphSidebarSubtitle.textContent = 'Hover to preview a chapter in the graph. Click to collapse the graph to that chapter.';
+    depGraphSidebarBackButton.hidden = true;
+  }
+
+  if (!items.length) {
+    depGraphSidebarStatus.hidden = true;
+    depGraphSidebarStatus.textContent = '';
+    depGraphSidebarList.hidden = true;
+    return;
+  }
+
+  depGraphSidebarStatus.hidden = true;
+  depGraphSidebarStatus.textContent = '';
+  depGraphSidebarList.hidden = false;
+
+  items.forEach(function(item) {
+    const listItem = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'depgraph-sidebar__item';
+    button.dataset.topId = depGraphState.activeTopId ? depGraphState.activeTopId : item.id;
+    button.dataset.childId = depGraphState.activeTopId ? item.id : '';
+    function previewItem() {
+      if (depGraphState.activeTopId) {
+        setNavigationHover(depGraphState.activeTopId, item.id);
+      } else {
+        setNavigationHover(item.id, '');
+      }
+    }
+    function activateItem() {
+      if (depGraphState.activeTopId) {
+        selectSubchapterGroup(depGraphState.activeTopId, item.id);
+      } else {
+        selectChapterGroup(item.id);
+      }
+    }
+    button.addEventListener('mouseenter', previewItem);
+    button.addEventListener('focus', previewItem);
+    button.addEventListener('pointerdown', function(event) {
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      activateItem();
+    });
+    button.addEventListener('click', function(event) {
+      if (event.detail !== 0) {
+        return;
+      }
+      activateItem();
+    });
+
+    const heading = document.createElement('span');
+    heading.className = 'depgraph-sidebar__heading';
+
+    const label = document.createElement('span');
+    label.className = 'depgraph-sidebar__label';
+    label.textContent = item.label;
+    heading.appendChild(label);
+    button.appendChild(heading);
+
+    const meta = document.createElement('span');
+    meta.className = 'depgraph-sidebar__meta';
+
+    const count = document.createElement('span');
+    count.className = 'depgraph-sidebar__count';
+    count.textContent = `${item.nodeIds.size}`;
+    meta.appendChild(count);
+
+    button.appendChild(meta);
+    listItem.appendChild(button);
+    depGraphSidebarList.appendChild(listItem);
+  });
+
+  syncNavigationSidebarItemStates();
+}
+
+window.depGraphChapterSidebar = {
+  on: function(type, listener) {
+    depGraphChapterSidebarEventTarget.addEventListener(type, listener);
+  },
+  off: function(type, listener) {
+    depGraphChapterSidebarEventTarget.removeEventListener(type, listener);
+  },
+  getState: navigationSidebarStateDetail,
+  groups: function() {
+    return depGraphSidebarState ? depGraphSidebarState.topGroups.map(function(group) {
+      return serializeNavigationGroup(group, '');
+    }) : [];
+  },
+  preview: function(topId, childId) {
+    if (!topId) {
+      clearNavigationHover();
+      return;
+    }
+    setNavigationHover(topId, childId || '');
+  },
+  clearPreview: clearNavigationHover,
+  selectTop: selectChapterGroup,
+  selectChild: selectSubchapterGroup,
+  reset: resetNavigationSelection,
+};
+
+function refreshGraphPresentation() {
+  if (!depGraphState) {
+    return;
+  }
+
+  const visibleNodeIds = visibleNodeIdsForCurrentView();
+  if (requestVisibleGraphLayout(visibleNodeIds)) {
+    return;
+  }
+
+  const state = currentEmphasisState();
+
+  depGraphState.nodes.forEach(function(nodeElement, nodeId) {
+    const hidden = !visibleNodeIds.has(nodeId);
+    const active = !state || state.activeNodes.has(nodeId);
+    nodeElement.classList.toggle('depgraph-view-hidden', hidden);
+    nodeElement.classList.toggle('depgraph-focus-muted', !hidden && Boolean(state) && !active);
+    nodeElement.classList.toggle('depgraph-focus-active', !hidden && Boolean(state) && active);
+    nodeElement.classList.toggle('depgraph-focus-anchor', !hidden && Boolean(state) && state.selectedNodeIds.has(nodeId));
+  });
+
+  depGraphState.edges.forEach(function(edge) {
+    const hidden = !visibleNodeIds.has(edge.source) || !visibleNodeIds.has(edge.target);
+    const active = !state || state.activeEdges.has(edge.id);
+    edge.element.classList.toggle('depgraph-view-hidden', hidden);
+    edge.element.classList.toggle('depgraph-focus-muted', !hidden && Boolean(state) && !active);
+    edge.element.classList.toggle('depgraph-focus-active', !hidden && Boolean(state) && active);
+  });
+
+  syncEdgeHitboxPresentation(visibleNodeIds);
+  renderCollapsedSummaries(visibleNodeIds, state);
+}
+
+function traverseSemanticDirectional(nodeId, edgeMap, nextNodeKey) {
+  const nodes = new Set([nodeId]);
+  const stack = [nodeId];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    (edgeMap.get(current) || []).forEach(function(edge) {
+      const nextNodeId = edge[nextNodeKey];
+      if (!nodes.has(nextNodeId)) {
+        nodes.add(nextNodeId);
+        stack.push(nextNodeId);
+      }
+    });
+  }
+
+  return nodes;
+}
+
+function visibleActiveEdgeIds(activeNodes) {
+  const edgeIds = new Set();
+  depGraphState.edges.forEach(function(edge, edgeId) {
+    if (activeNodes.has(edge.source) && activeNodes.has(edge.target)) {
+      edgeIds.add(edgeId);
+    }
+  });
+  return edgeIds;
+}
+
+function focusStateForEdge(edgeId) {
+  const edge = depGraphState.edges.get(edgeId);
+  if (!edge) {
+    return null;
+  }
+
+  const upstreamNodes = traverseSemanticDirectional(edge.source, depGraphState.summaryIncoming, 'source');
+  const downstreamNodes = traverseSemanticDirectional(edge.target, depGraphState.summaryOutgoing, 'target');
+  const activeNodes = new Set([edge.source, edge.target, ...upstreamNodes, ...downstreamNodes]);
+
+  return {
+    focusKey: `edge:${edgeId}`,
+    activeNodes: activeNodes,
+    activeEdges: visibleActiveEdgeIds(activeNodes),
+    selectedNodeIds: new Set(),
+  };
+}
+
+function cloneFocusState(state) {
+  if (!state) {
+    return null;
+  }
+
+  return {
+    focusKey: state.focusKey || '',
+    activeNodes: new Set(state.activeNodes || []),
+    activeEdges: new Set(state.activeEdges || []),
+    selectedNodeIds: new Set(state.selectedNodeIds || []),
+  };
+}
+
+function focusStateForNode(nodeId) {
+  const semanticIncidentEdges = [
+    ...(depGraphState.summaryIncoming.get(nodeId) || []),
+    ...(depGraphState.summaryOutgoing.get(nodeId) || []),
+  ];
+
+  if (!semanticIncidentEdges.length) {
+    return {
+      focusKey: `node:${nodeId}`,
+      activeNodes: new Set([nodeId]),
+      activeEdges: new Set(),
+      selectedNodeIds: new Set([nodeId]),
+    };
+  }
+
+  const upstreamNodes = traverseSemanticDirectional(nodeId, depGraphState.summaryIncoming, 'source');
+  const downstreamNodes = traverseSemanticDirectional(nodeId, depGraphState.summaryOutgoing, 'target');
+  const activeNodes = new Set([nodeId, ...upstreamNodes, ...downstreamNodes]);
+  return {
+    focusKey: `node:${nodeId}`,
+    activeNodes: activeNodes,
+    activeEdges: visibleActiveEdgeIds(activeNodes),
+    selectedNodeIds: new Set([nodeId]),
+  };
+}
+
+function applyFocusState(state) {
+  refreshGraphPresentation();
+}
+
+function syncFocusedNodeState() {
+  if (!depGraphPinnedNode || !depGraphState.nodes.has(depGraphPinnedNode)) {
+    return;
+  }
+
+  depGraphState.currentFocus = focusStateForNode(depGraphPinnedNode);
+}
+
+function clearFocus() {
+  depGraphState.currentFocus = null;
+  depGraphPinnedNode = null;
+  depGraphState.hoveredNodeId = '';
+  applyFocusState(null);
+  hideTooltip();
+}
+
+function focusEdge(edgeId) {
+  const nextFocus = focusStateForEdge(edgeId);
+  if (!nextFocus) {
+    return;
+  }
+
+  if (depGraphState.currentFocus && depGraphState.currentFocus.focusKey === nextFocus.focusKey) {
+    clearFocus();
+    return;
+  }
+
+  if (depGraphState.hoveredGroup) {
+    depGraphState.hoveredGroup = null;
+    syncNavigationSidebarItemStates();
+  }
+  depGraphState.hoveredNodeId = '';
+  depGraphPinnedNode = null;
+  depGraphState.currentFocus = nextFocus;
+  applyFocusState(nextFocus);
+  hideTooltip();
+}
+
+function focusNode(nodeId) {
+  const nextFocus = focusStateForNode(nodeId);
+  if (!nextFocus) {
+    return;
+  }
+
+  if (depGraphState.hoveredGroup) {
+    depGraphState.hoveredGroup = null;
+    syncNavigationSidebarItemStates();
+  }
+
+  if (depGraphPinnedNode === nodeId && depGraphState.currentFocus && depGraphState.currentFocus.focusKey === nextFocus.focusKey) {
+    clearFocus();
+    return;
+  }
+
+  depGraphPinnedNode = nodeId;
+  depGraphState.currentFocus = nextFocus;
+  depGraphState.hoveredNodeId = '';
+  applyFocusState(nextFocus);
+  hideHoverTooltip();
+  showTooltip(nodeId, { mode: 'pinned' });
+}
+
+function buildGraphState(previousState) {
+  const nodes = new Map();
+  const sceneGroup = graphSceneGroup();
+  if (!sceneGroup) {
+    return previousState || {
+      nodes: new Map(),
+      nodeCenters: new Map(),
+      edges: new Map(),
+      edgePairs: new Map(),
+      incoming: new Map(),
+      outgoing: new Map(),
+      currentFocus: null,
+      activeTopId: '',
+      activeChildId: '',
+      expandedNodeIds: new Set(),
+      hoveredGroup: null,
+      hoveredNodeId: '',
+      collapsedSummaries: new Map(),
+      summaryIncoming: new Map(),
+      summaryOutgoing: new Map(),
+      collapsedIncoming: new Map(),
+      collapsedOutgoing: new Map(),
+      fullNodeCenters: new Map(),
+    };
+  }
+
+  sceneGroup.querySelectorAll('g.node').forEach(function(nodeElement) {
+    const titleElement = nodeElement.querySelector('title');
+    const explicitNodeId = graphvizObjectValue('depgraph-node-', nodeElement.getAttribute('id') || '');
+    const nodeId = explicitNodeId || (titleElement ? titleElement.textContent.trim() : '');
+    if (!nodeId) {
+      return;
+    }
+
+    nodeElement.dataset.nodeId = nodeId;
+    nodes.set(nodeId, nodeElement);
+  });
+  const nodeCenters = new Map();
+  nodes.forEach(function(nodeElement, nodeId) {
+    const shape = nodeElement.querySelector('ellipse, polygon, rect, path');
+    const box = (shape || nodeElement).getBBox();
+    nodeCenters.set(nodeId, {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
+  });
+  const fullNodeCenters = previousState && previousState.fullNodeCenters
+    ? new Map(previousState.fullNodeCenters)
+    : new Map();
+  if (!previousState || !previousState.activeTopId) {
+    nodeCenters.forEach(function(center, nodeId) {
+      fullNodeCenters.set(nodeId, center);
+    });
+  }
+
+  const edges = new Map();
+  const edgePairs = new Map();
+  const incoming = new Map();
+  const outgoing = new Map();
+  let index = 0;
+  sceneGroup.querySelectorAll('g.edge').forEach(function(edgeElement) {
+    const titleElement = edgeElement.querySelector('title');
+    const parsed = parseEdgeTitle(titleElement ? titleElement.textContent.trim() : '');
+    if (!parsed) {
+      return;
+    }
+
+    const explicitEdgeId = graphvizObjectValue('depgraph-edge-', edgeElement.getAttribute('id') || '');
+    const edgeId = explicitEdgeId || `${parsed.source}->${parsed.target}:${index++}`;
+    const edge = {
+      id: edgeId,
+      source: parsed.source,
+      target: parsed.target,
+      element: edgeElement,
+    };
+    edgeElement.dataset.edgeId = edgeId;
+    edges.set(edgeId, edge);
+    const pairKey = `${parsed.source}->${parsed.target}`;
+    if (!edgePairs.has(pairKey)) {
+      edgePairs.set(pairKey, []);
+    }
+    edgePairs.get(pairKey).push(edgeId);
+
+    if (!incoming.has(parsed.target)) {
+      incoming.set(parsed.target, []);
+    }
+    incoming.get(parsed.target).push(edgeId);
+
+    if (!outgoing.has(parsed.source)) {
+      outgoing.set(parsed.source, []);
+    }
+    outgoing.get(parsed.source).push(edgeId);
+  });
+
+  depGraphSidebarState = buildNavigationModel();
+  const semanticOutgoing = new Map();
+  const semanticIncoming = new Map();
+  const fullEdges = depGraphSidebarState
+    && depGraphSidebarState.payload
+    && Array.isArray(depGraphSidebarState.payload.fullEdges)
+      ? depGraphSidebarState.payload.fullEdges
+      : Array.from(edges.values()).map(function(edge) {
+          return {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            kind: 'display',
+          };
+        });
+  fullEdges.forEach(function(edge, index) {
+    const summaryEdge = {
+      id: edge.id || `summary:${edge.source}->${edge.target}:${index}`,
+      source: edge.source,
+      target: edge.target,
+      kind: edge.kind || '',
+    };
+    if (!semanticOutgoing.has(summaryEdge.source)) {
+      semanticOutgoing.set(summaryEdge.source, []);
+    }
+    semanticOutgoing.get(summaryEdge.source).push(summaryEdge);
+    if (!semanticIncoming.has(summaryEdge.target)) {
+      semanticIncoming.set(summaryEdge.target, []);
+    }
+    semanticIncoming.get(summaryEdge.target).push(summaryEdge);
+  });
+
+  const collapsedOutgoing = new Map();
+  const collapsedIncoming = new Map();
+  const collapsedEdges = depGraphSidebarState
+    && depGraphSidebarState.payload
+    && Array.isArray(depGraphSidebarState.payload.displayEdges)
+      ? depGraphSidebarState.payload.displayEdges
+      : fullEdges;
+  collapsedEdges.forEach(function(edge, index) {
+    const collapsedEdge = {
+      id: edge.id || `collapsed:${edge.source}->${edge.target}:${index}`,
+      source: edge.source,
+      target: edge.target,
+      kind: edge.kind || '',
+    };
+    if (!collapsedOutgoing.has(collapsedEdge.source)) {
+      collapsedOutgoing.set(collapsedEdge.source, []);
+    }
+    collapsedOutgoing.get(collapsedEdge.source).push(collapsedEdge);
+    if (!collapsedIncoming.has(collapsedEdge.target)) {
+      collapsedIncoming.set(collapsedEdge.target, []);
+    }
+    collapsedIncoming.get(collapsedEdge.target).push(collapsedEdge);
+  });
+
+  return {
+    nodes: nodes,
+    nodeCenters: nodeCenters,
+    edges: edges,
+    edgePairs: edgePairs,
+    incoming: incoming,
+    outgoing: outgoing,
+    currentFocus: previousState ? cloneFocusState(previousState.currentFocus) : null,
+    activeTopId: previousState ? previousState.activeTopId : '',
+    activeChildId: previousState ? previousState.activeChildId : '',
+    expandedNodeIds: previousState ? new Set(previousState.expandedNodeIds || []) : new Set(),
+    hoveredGroup: previousState ? previousState.hoveredGroup : null,
+    hoveredNodeId: previousState ? previousState.hoveredNodeId || '' : '',
+    collapsedSummaries: new Map(),
+    summaryIncoming: semanticIncoming,
+    summaryOutgoing: semanticOutgoing,
+    collapsedIncoming: collapsedIncoming,
+    collapsedOutgoing: collapsedOutgoing,
+    fullNodeCenters: fullNodeCenters,
+  };
+}
+
+function bindNodeInteractions() {
+  depGraphState.nodes.forEach(function(nodeElement, nodeId) {
+    nodeElement.setAttribute('pointer-events', 'fill');
+    nodeElement.addEventListener('mouseenter', function(event) {
+      setHoveredNode(nodeId);
+      if (depGraphPinnedNode === nodeId) {
+        return;
+      }
+      showTooltip(nodeId, { mode: 'hover', event: event });
+    });
+    nodeElement.addEventListener('mousemove', function(event) {
+      moveHoverTooltip(event);
+    });
+    nodeElement.addEventListener('mouseleave', function() {
+      setHoveredNode('');
+      hideHoverTooltip();
+    });
+  });
+}
+
+function bindEdgeInteractions() {}
+
+function bindGlobalInteractions() {
+  if (depGraphGlobalInteractionsBound) {
+    return;
+  }
+  depGraphGlobalInteractionsBound = true;
+
+  graphElement.addEventListener('click', function(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) {
+      clearFocus();
+      return;
+    }
+
+    if (target.closest('.depgraph-collapsed-badge, .depgraph-focus-tooltip, .depgraph-focus-action-menu')) {
+      return;
+    }
+
+    const nodeElement = target.closest('g.node');
+    if (nodeElement && nodeElement.dataset.nodeId) {
+      focusNode(nodeElement.dataset.nodeId);
+      return;
+    }
+
+    const edgeHitboxElement = target.closest('.depgraph-edge-hitbox');
+    if (edgeHitboxElement && edgeHitboxElement.dataset.edgeId) {
+      focusEdge(edgeHitboxElement.dataset.edgeId);
+      return;
+    }
+
+    const edgeElement = target.closest('g.edge');
+    if (edgeElement && edgeElement.dataset.edgeId) {
+      focusEdge(edgeElement.dataset.edgeId);
+      return;
+    }
+
+    clearFocus();
+  });
+
+  document.addEventListener('pointerdown', function(event) {
+    if (!graphElement.contains(event.target)) {
+      clearFocus();
+    }
+  });
+
+  window.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      clearFocus();
+    }
+  });
+
+  if (typeof ResizeObserver === 'function' && !depGraphResizeObserver) {
+    depGraphResizeObserver = new ResizeObserver(function() {
+      schedulePinnedTooltipSync();
+    });
+    depGraphResizeObserver.observe(graphElement);
+  }
+}
+
+function interactive() {
+  if (depGraphNavToggle) {
+    depGraphNavToggle.onclick = toggleNavigationPanel;
+  }
+  if (depGraphLegendToggle) {
+    depGraphLegendToggle.onclick = toggleLegend;
+  }
+
+  depGraphState = buildGraphState(depGraphState);
+  syncOverlayViewport();
+  bindOverlayZoomSync();
+  renderEdgeHitboxes();
+  depGraphRenderedGraphKey = visibleGraphKey(visibleNodeIdsForCurrentView());
+  depGraphRenderingGraphKey = null;
+  depGraphSidebarBackButton.onclick = resetNavigationSelection;
+  depGraphSidebarList.onmouseleave = clearNavigationHover;
+  depGraphSidebarRoot.onmouseleave = clearNavigationHover;
+  renderNavigationSidebar();
+  emitNavigationSidebarEvent('chapter-sidebar-ready', '', '', {
+    groups: window.depGraphChapterSidebar.groups(),
+  });
+  hideTooltip();
+  syncFocusedNodeState();
+  if (depGraphPinnedNode && depGraphState.nodes.has(depGraphPinnedNode)) {
+    showTooltip(depGraphPinnedNode, { mode: 'pinned' });
+  }
+  bindNodeInteractions();
+  bindEdgeInteractions();
+  bindGlobalInteractions();
+  refreshGraphPresentation();
+  setRelayoutAnimating(false);
+
+  d3.selectAll('.dep-closebtn').on('click', function() {
+    var modal = d3.select(this).node().parentNode.parentNode.parentNode;
+    d3.select(modal).style('display', 'none');
+  });
+}
+
+captureTheoremSources();
+depGraphSidebarState = buildNavigationModel();
+graphviz.onerror(function(error) {
+  depGraphRenderingGraphKey = null;
+  setRelayoutAnimating(false);
+  console.error('depgraph relayout error', error);
+});
+graphviz.on("end", interactive);
+const initialVisibleNodeIds = canRenderVisibleDot()
+  ? new Set(depGraphSidebarState.payload.nodes.map(function(node) { return node.id; }))
+  : null;
+const initialDotSource = initialVisibleNodeIds ? buildVisibleDot(initialVisibleNodeIds) : dotSource;
+graphviz
+    .width(Math.max(graphElement.clientWidth, 1))
+    .height(Math.max(graphElement.clientHeight, 1))
+    .fit(true)
+    .renderDot(initialDotSource);
+
+</script>
+{% for js in config.html5.get('extra-js', []) %}
+<script type="text/javascript" src="js/{{ js }}"></script>
+{% endfor %}
+</body>
+</html>
+

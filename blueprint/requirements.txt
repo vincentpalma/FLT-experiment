@@ -1,7 +1,9 @@
 # https://github.com/pyinvoke/invoke/issues/891
 invoke==2.2.0
 plasTeX @ git+https://github.com/plastex/plastex.git
-plastexdepgraph @ git+https://github.com/PatrickMassot/plastexdepgraph.git
+# The blueprint workflow sets FLT_REPO_ROOT so the interactive graph plugin is
+# installed from this repository instead of PatrickMassot/plastexdepgraph.
+plastexdepgraph @ file://${FLT_REPO_ROOT}/vendor/plastexdepgraph
 plastexshowmore @ git+https://github.com/PatrickMassot/plastexshowmore.git
 leanblueprint @ git+https://github.com/PatrickMassot/leanblueprint.git
 watchfiles==0.16.1

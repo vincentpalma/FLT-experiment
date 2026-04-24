@@ -1,0 +1,746 @@
+header {
+  height: 3rem;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+header a {
+  text-decoration: none;
+  color: inherit;
+}
+
+header a:visited {
+  color: inherit;
+}
+
+header h1 {
+  position: absolute;
+}
+
+.depgraph-header-nav {
+  align-items: stretch;
+  display: flex;
+  gap: .2rem;
+  height: 100%;
+  margin-right: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.depgraph-header-nav .toc,
+.depgraph-header-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  padding: 0 .7rem;
+  text-decoration: none;
+}
+
+.depgraph-header-nav .toc:focus-visible,
+.depgraph-header-nav .toc:hover,
+.depgraph-header-button:focus-visible,
+.depgraph-header-button:hover,
+.depgraph-header-button--active {
+  background: rgba(255, 255, 255, .16);
+}
+
+.depgraph-layout {
+  position: relative;
+}
+
+.depgraph-stage {
+  position: relative;
+  min-width: 0;
+}
+
+.depgraph-sidebar {
+  left: 1rem;
+  max-height: calc(90vh - 2rem);
+  overflow: auto;
+  position: absolute;
+  top: 1rem;
+  width: min(22rem, calc(100vw - 2rem));
+  z-index: 6;
+  border: 1px solid rgba(31, 35, 40, 0.13);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+  padding: .75rem 0 0;
+}
+
+.depgraph-sidebar--closed {
+  display: none;
+}
+
+.depgraph-sidebar__header {
+  display: grid;
+  gap: .3rem;
+  padding: 0 .9rem .65rem;
+}
+
+.depgraph-sidebar__topline {
+  display: flex;
+  gap: .55rem;
+  align-items: center;
+}
+
+.depgraph-sidebar__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.depgraph-sidebar__subtitle,
+.depgraph-sidebar__status {
+  margin: 0;
+  color: #475569;
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.depgraph-sidebar__status {
+  display: block;
+  padding: 0 .9rem .75rem;
+}
+
+.depgraph-sidebar__back {
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  padding: 0;
+}
+
+.depgraph-sidebar__back svg {
+  display: block;
+}
+
+.depgraph-sidebar__list {
+  border-top: 1px solid rgba(31, 35, 40, 0.09);
+  display: block;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.depgraph-sidebar__item {
+  display: flex;
+  justify-content: space-between;
+  gap: .65rem;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid rgba(31, 35, 40, 0.08);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.25;
+  padding: .5rem .9rem;
+  text-align: left;
+  transition: background-color .15s ease;
+}
+
+.depgraph-sidebar__item:hover,
+.depgraph-sidebar__item:focus-visible {
+  background: rgba(239, 246, 255, 0.95);
+}
+
+.depgraph-sidebar__item--preview {
+  background: rgba(239, 246, 255, 0.95);
+}
+
+.depgraph-sidebar__item--active {
+  background: rgba(219, 234, 254, 0.95);
+}
+
+.depgraph-sidebar__heading {
+  display: grid;
+  gap: .18rem;
+  min-width: 0;
+}
+
+.depgraph-sidebar__ref {
+  color: #64748b;
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.depgraph-sidebar__label {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.depgraph-sidebar__meta {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.depgraph-sidebar__count {
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: .22rem .48rem;
+  background: rgba(226, 232, 240, 0.95);
+  color: #334155;
+}
+
+div#graph {
+  position: relative;
+  width: 100%;
+  height: 90vh;
+  resize: both;
+  overflow: hidden; }
+
+#depgraph-render,
+#depgraph-overlay,
+#depgraph-ui {
+  position: absolute;
+  inset: 0;
+}
+
+div#graph.depgraph-relayouting {
+  cursor: progress;
+}
+
+div#graph.depgraph-relayouting #depgraph-render > svg {
+  pointer-events: none;
+}
+
+#depgraph-render > svg {
+  position: relative;
+  z-index: 1;
+}
+
+#depgraph-overlay {
+  z-index: 2;
+  pointer-events: none;
+}
+
+#depgraph-ui {
+  z-index: 3;
+  pointer-events: none;
+}
+
+
+div#statements {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background-color: #e8e8e8; /* FIXME: use sass */
+}
+
+#Legend {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 7;
+}
+
+#Legend dl {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  display: none;
+  font-size: 105%;
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: min(24rem, calc(90vh - 2rem));
+  overflow: auto;
+  background: white;
+  z-index: 8;
+  border: 1px solid rgba(31, 35, 40, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+  padding: .75rem 1rem;
+}
+
+#Legend dt {
+  font-weight: bold;
+}
+
+#Legend dt::after {
+ content: ":";
+}
+
+#Legend dd {
+	margin-left: .5rem;
+	margin-right: 1rem;
+	display: inline;
+}
+
+
+button.dep-closebtn
+{
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 100%;
+    font-weight: bold;
+
+    background: Transparent;
+    border: none;
+
+    text-decoration: none;
+
+/*    color: #fff;*/
+    cursor: pointer;
+}
+
+div.dep-modal-container {
+  position: fixed;
+  z-index: $modal-z-index;
+  top: 0;
+  left: 0;
+
+  display: none;
+
+  width: 90vw;
+  margin-top: 4rem;
+  margin-left: 5vw;
+  margin-right: 5vw;
+}
+div.dep-modal-content {
+  font-weight: normal;
+
+  overflow: auto;
+
+  margin: auto;
+
+  vertical-align: middle;
+
+  border: 1px solid #497da5; /* FIXME use sass, compare main modals */
+  border-radius: 5px;
+  background-color: white;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, .2), 0 6px 20px 0 rgba(0, 0, 0, .19);
+  padding: .5rem 1rem .2rem 1rem;
+}
+
+div.dep-modal-content a {
+  color: inherit;
+  text-decoration: none;
+}
+
+div.thm_icons .icon {
+    width: .7rem;
+    height: .7rem;
+}
+
+a.latex_link, a.lean_link, a.issue_link {
+    font-weight: normal;
+    font-size: 90%;
+    font-style: italic;
+}
+
+a.latex_link {
+	padding-left: 1rem;
+}
+
+a.lean_link, a.issue_link {
+	padding-left: .5rem;
+}
+
+
+/* Tooltip container */
+.tooltip {
+  font-weight: normal;
+  margin-left: .5rem;
+  position: relative;
+  display: inline-block;
+}
+
+/* Tooltip text */
+.tooltip .tooltip_list {
+  visibility: hidden;
+  text-align: center;
+  border-radius: 6px;
+ 
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+}
+
+ul.tooltip_list {
+  list-style-type: none;
+  padding-left: 0;
+  border: 1px solid #497da5; /* FIXME use sass, compare main modals */
+  border-radius: 5px;
+  background-color: white;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, .2), 0 6px 20px 0 rgba(0, 0, 0, .19);
+}
+
+ul.tooltip_list li {
+  padding: .1rem .5rem;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltip_list {
+  visibility: visible;
+}
+
+.node {
+  cursor: pointer;
+}
+
+g.edge {
+  cursor: pointer;
+}
+
+g.edge path {
+  pointer-events: stroke;
+}
+
+g.edge polygon {
+  pointer-events: visiblePainted;
+}
+
+.depgraph-view-hidden {
+  display: none;
+}
+
+.depgraph-edge-hitbox {
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-width: 14px;
+  vector-effect: non-scaling-stroke;
+}
+
+.depgraph-collapsed-summary-layer,
+.depgraph-collapsed-badge-layer {
+  pointer-events: none;
+}
+
+.depgraph-collapsed-summary__path {
+  fill: none;
+  stroke: rgba(31, 35, 40, 0.45);
+  stroke-dasharray: 7 5;
+  stroke-linecap: round;
+  stroke-width: 2.2px;
+}
+
+.depgraph-collapsed-badge {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.depgraph-collapsed-badge:focus {
+  outline: none;
+}
+
+.depgraph-collapsed-badge__hitarea {
+  fill: transparent;
+}
+
+.depgraph-collapsed-badge__halo {
+  fill: rgba(255, 255, 255, 0.94);
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 7px;
+  vector-effect: non-scaling-stroke;
+}
+
+.depgraph-collapsed-badge__shell {
+  fill: rgba(255, 255, 255, 0.98);
+  stroke: #497da5;
+  stroke-width: 1.8px;
+  filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.18));
+  vector-effect: non-scaling-stroke;
+}
+
+.depgraph-collapsed-badge__count {
+  fill: #1f2937;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
+}
+
+.depgraph-collapsed-badge:hover .depgraph-collapsed-badge__shell,
+.depgraph-collapsed-badge:focus-visible .depgraph-collapsed-badge__shell {
+  fill: #f7fbff;
+  stroke: #315f80;
+}
+
+.depgraph-collapsed-badge:hover .depgraph-collapsed-badge__count,
+.depgraph-collapsed-badge:focus-visible .depgraph-collapsed-badge__count {
+  fill: #111827;
+}
+
+.depgraph-collapsed-badge.depgraph-focus-muted {
+  opacity: .12;
+}
+
+.depgraph-collapsed-badge.depgraph-focus-active {
+  opacity: 1;
+}
+
+.depgraph-collapsed-summary.depgraph-focus-muted .depgraph-collapsed-summary__path {
+  opacity: .1;
+}
+
+.depgraph-collapsed-summary.depgraph-focus-active .depgraph-collapsed-summary__path {
+  opacity: .9;
+}
+
+g.node.depgraph-focus-muted ellipse,
+g.node.depgraph-focus-muted polygon,
+g.node.depgraph-focus-muted path,
+g.node.depgraph-focus-muted text {
+  opacity: .16;
+}
+
+g.node.depgraph-focus-active ellipse,
+g.node.depgraph-focus-active polygon,
+g.node.depgraph-focus-active path,
+g.node.depgraph-focus-active text,
+g.edge.depgraph-focus-active path,
+g.edge.depgraph-focus-active polygon,
+g.edge.depgraph-focus-active text {
+  opacity: 1;
+}
+
+g.node.depgraph-focus-anchor ellipse,
+g.node.depgraph-focus-anchor polygon,
+g.node.depgraph-focus-anchor path {
+  stroke-width: 3px;
+}
+
+g.edge.depgraph-focus-muted path,
+g.edge.depgraph-focus-muted polygon,
+g.edge.depgraph-focus-muted text {
+  opacity: .08;
+}
+
+.depgraph-focus-tooltip {
+  position: absolute;
+  z-index: 5;
+  width: min(36.4rem, calc(100% - 2rem));
+  max-width: 36.4rem;
+  border: 1px solid rgba(31, 35, 40, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  color: inherit;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: normal;
+  line-height: 1.4rem;
+  padding: .85rem .95rem;
+  transform: translate3d(0, 0, 0);
+  pointer-events: none;
+}
+
+.depgraph-focus-tooltip[hidden] {
+  display: none;
+}
+
+.depgraph-focus-tooltip--pinned {
+  max-height: min(46rem, calc(100% - 1rem));
+  overflow-x: hidden;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.depgraph-focus-tooltip__card {
+  display: grid;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.depgraph-focus-tooltip__header {
+  display: grid;
+  gap: .35rem;
+  min-width: 0;
+}
+
+.depgraph-focus-tooltip__heading {
+  display: block;
+  color: inherit;
+  font-family: inherit;
+  overflow: hidden;
+  padding-right: 1.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.depgraph-focus-tooltip__close {
+  position: absolute;
+  top: .5rem;
+  right: .6rem;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  padding: 0;
+}
+
+div.depgraph-focus-tooltip__statement.thm_thmcontent {
+  color: inherit;
+  font-family: inherit;
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  font-weight: normal;
+  padding: 0;
+}
+
+.depgraph-focus-tooltip__statement .displaymath,
+.depgraph-focus-tooltip__statement .tikzcd {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
+.depgraph-focus-tooltip__statement mjx-container[display="true"] {
+  min-width: max-content;
+}
+
+.depgraph-focus-tooltip__statement .equation {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.depgraph-focus-tooltip__statement .equation > p {
+  display: none;
+}
+
+.depgraph-focus-tooltip__statement .equation .equation_content {
+  flex: 0 0 auto;
+  display: block;
+  margin: 0 auto;
+  min-width: max-content;
+  width: max-content;
+}
+
+.depgraph-focus-tooltip__statement .equation .equation_label {
+  flex: 0 0 auto;
+  margin-right: 1rem;
+  white-space: nowrap;
+}
+
+.depgraph-focus-tooltip__close .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.depgraph-focus-tooltip__statement p:first-child {
+  margin-top: 0;
+}
+
+.depgraph-focus-tooltip__statement p:last-child {
+  margin-bottom: 0;
+}
+
+.depgraph-focus-tooltip__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .7rem;
+  align-items: center;
+}
+
+.depgraph-focus-tooltip__menu-trigger {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font: inherit;
+  font-size: 90%;
+  font-style: italic;
+  font-weight: normal;
+  margin: 0;
+  padding: 0;
+}
+
+.depgraph-focus-tooltip__menu-trigger:hover,
+.depgraph-focus-tooltip__menu-trigger:focus-visible,
+.depgraph-focus-tooltip__menu-trigger--open {
+  color: #4b5563;
+}
+
+.depgraph-focus-action-menu {
+  position: absolute;
+  z-index: 6;
+  min-width: 15rem;
+  max-width: min(28rem, calc(100% - 2rem));
+  border: 1px solid #497da5;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  padding: .35rem 0;
+}
+
+.depgraph-focus-action-menu[hidden] {
+  display: none;
+}
+
+.depgraph-focus-action-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.depgraph-focus-action-menu__list li {
+  padding: 0;
+}
+
+.depgraph-focus-action-menu__list a {
+  display: block;
+  color: #6b7280;
+  padding: .3rem .75rem;
+  text-decoration: none;
+}
+
+.depgraph-focus-action-menu__list a:hover,
+.depgraph-focus-action-menu__list a:focus-visible {
+  background: rgba(73, 125, 165, 0.08);
+  color: #4b5563;
+}
+
+.depgraph-focus-tooltip a,
+.depgraph-focus-tooltip .latex_link,
+.depgraph-focus-tooltip .lean_link,
+.depgraph-focus-tooltip .issue_link,
+.depgraph-focus-tooltip .lean_decl {
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.depgraph-focus-tooltip .latex_link,
+.depgraph-focus-tooltip .lean_link,
+.depgraph-focus-tooltip .issue_link,
+.depgraph-focus-tooltip .lean_decl {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.depgraph-focus-tooltip a:hover,
+.depgraph-focus-tooltip a:focus-visible {
+  color: #4b5563;
+  text-decoration: none;
+}
+
+@media (max-width: 1100px) {
+  .depgraph-sidebar {
+    max-height: calc(90vh - 2rem);
+    width: min(20rem, calc(100vw - 2rem));
+  }
+}
