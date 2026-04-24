@@ -136,19 +136,11 @@ The key theorem about hardly ramified representations is the following.
 Note that this (deep) claim is a consequence of Serre's conjecture~\cite{serreconj},
 now a theorem of Khare and Wintenberger~\cite{kwII}, and indeed we shall use
 methods introduced by Khare and Wintenberger to prove this special case of
-Serre's conjecture. Given this result, we can deduce Theorem~\ref{Wiles_Frey}
-(which we restate here) easily:
-
-\begin{theorem}
-  \label{Wiles_Frey_again}
-  \lean{Wiles_Frey}
-  \leanok
-  If $\overline{\rho}$ is the mod $p$ Galois representation associated to a Frey package $(a,b,c,p)$ then
-  $\overline{\rho}$ is reducible.
-\end{theorem}
+Serre's conjecture. Given this result, we can now prove Theorem~\ref{Wiles_Frey}:
 \begin{proof}
+  \proves{Wiles_Frey}
   \uses{Frey_curve_hardly_ramified,hardly_ramified_reducible}
-  Indeed, $\rho$ is hardly ramified by theorem~\ref{Frey_curve_hardly_ramified}
+  Indeed, the mod $p$ representation attached to the Frey package is hardly ramified by theorem~\ref{Frey_curve_hardly_ramified}
   and thus reducible by theorem~\ref{hardly_ramified_reducible}.
 \end{proof}
 

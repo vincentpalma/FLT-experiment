@@ -371,17 +371,8 @@ and we don't have a definition of nonarchimedean local field yet.
   Openness is already in mathlib.
 \end{proof}
 
-\begin{lemma}
-  \lean{NumberField.instCompactSpaceAdicCompletionIntegers}
-  \label{NumberField.instCompactSpaceAdicCompletionIntegers}
-  \leanok
-  $\calO_v$ is a compact subring of $K_v$.
-\end{lemma}
-\begin{proof}
-  \leanok
-  Compactness lies a little deeper because it
-  assumes that the residue field of $K_v$ is finite.
-\end{proof}
+We will use theorem~\ref{NumberField.instCompactSpaceAdicCompletionIntegers} from the Adele
+miniproject for the compactness of $\calO_v$ in $K_v$.
 
 \begin{lemma} $M_2(\calO_v)$ is an open subring of $M_2(K_v)$.
   \lean{IsDedekindDomain.M2.localFullLevel.isOpen}

@@ -9,6 +9,7 @@ on:
       - 'blueprint/**'
       - 'docs/**'
       - 'scripts/**'
+      - 'vendor/**'
       - 'lean-toolchain'
       - 'lakefile.toml'
       - 'lake-manifest.json'
@@ -21,6 +22,7 @@ on:
       - 'blueprint/**'
       - 'docs/**'
       - 'scripts/**'
+      - 'vendor/**'
       - 'lean-toolchain'
       - 'lakefile.toml'
       - 'lake-manifest.json'
@@ -93,6 +95,9 @@ jobs:
 
       - name: Compile blueprint and documentation
         uses: leanprover-community/docgen-action@dac784713171529c96f6d0470f7af30249a02a5d # 2026-02-08
+        env:
+          FLT_REPO_ROOT: ${{ github.workspace }}
         with:
           blueprint: true
           homepage: docs
+          api-docs: false
