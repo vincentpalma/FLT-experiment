@@ -746,8 +746,7 @@ def ProcessOptions(options, document):
     cb = PackagePreCleanupCB(data=make_graph_html)
     css = PackageCss(path=STATIC_DIR/'dep_graph.css', copy_only=True)
     js = [PackageJs(path=STATIC_DIR/name, copy_only=True)
-          for name in ['d3.min.js', 'hpcc.min.js', 'd3-graphviz.js',
-                       'expatlib.wasm', 'graphvizlib.wasm']]
+          for name in ['d3.min.js', 'hpcc.min.js', 'd3-graphviz.js']]
 
     document.addPackageResource([cb, css] + js)
 
@@ -763,4 +762,3 @@ def ProcessOptions(options, document):
 
     document.userdata['dep_graph']['legend'] = [('Boxes', 'definitions'), ('Ellipses', 'theorems and lemmas')]
     document.userdata['dep_graph']['extra_modal_links'] = []
-
