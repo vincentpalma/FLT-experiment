@@ -163,12 +163,20 @@ let depGraphRenderingGraphKey = null;
 let depGraphGlobalInteractionsBound = false;
 let depGraphResizeObserver = null;
 let depGraphZoomSyncBound = false;
+let depGraphCameraIntent = null;
+let depGraphCameraEpoch = 0;
 function setRelayoutAnimating(isAnimating) {
   graphElement.classList.toggle('depgraph-relayouting', isAnimating);
 }
 
 function depGraphRelayoutTransitionFactory() {
   return d3.transition('depgraph-relayout')
+    .duration(depGraphRelayoutDuration)
+    .ease(d3.easeCubicInOut);
+}
+
+function depGraphCameraTransitionFactory() {
+  return d3.transition('depgraph-camera')
     .duration(depGraphRelayoutDuration)
     .ease(d3.easeCubicInOut);
 }
@@ -229,6 +237,420 @@ function graphvizObjectValue(prefix, encodedValue) {
   } catch (error) {
     return '';
   }
+}
+
+function finiteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function graphDataChildren(datum) {
+  return datum && Array.isArray(datum.children) ? datum.children : [];
+}
+
+function graphDataText(datum) {
+  if (!datum) {
+    return '';
+  }
+  if (typeof datum.text === 'string') {
+    return datum.text;
+  }
+  const textChild = graphDataChildren(datum).find(function(child) {
+    return child.tag === '#text' && typeof child.text === 'string';
+  });
+  return textChild ? textChild.text : '';
+}
+
+function graphDataTitleText(datum) {
+  const title = graphDataChildren(datum).find(function(child) {
+    return child.tag === 'title';
+  });
+  return graphDataText(title).trim();
+}
+
+function graphDataNodeId(datum) {
+  const attrs = datum && datum.attributes ? datum.attributes : {};
+  if (attrs.class !== 'node') {
+    return '';
+  }
+  return graphvizObjectValue('depgraph-node-', attrs.id || '') || graphDataTitleText(datum);
+}
+
+function normalizeBBox(box) {
+  if (!box) {
+    return null;
+  }
+  const x = finiteNumber(box.x);
+  const y = finiteNumber(box.y);
+  const width = finiteNumber(box.width);
+  const height = finiteNumber(box.height);
+  if (x == null || y == null || width == null || height == null) {
+    return null;
+  }
+  return {
+    x: width >= 0 ? x : x + width,
+    y: height >= 0 ? y : y + height,
+    width: Math.abs(width),
+    height: Math.abs(height),
+  };
+}
+
+function unionBBoxes(boxes) {
+  const normalized = boxes.map(normalizeBBox).filter(Boolean);
+  if (!normalized.length) {
+    return null;
+  }
+  const x0 = Math.min(...normalized.map(function(box) { return box.x; }));
+  const y0 = Math.min(...normalized.map(function(box) { return box.y; }));
+  const x1 = Math.max(...normalized.map(function(box) { return box.x + box.width; }));
+  const y1 = Math.max(...normalized.map(function(box) { return box.y + box.height; }));
+  return {
+    x: x0,
+    y: y0,
+    width: x1 - x0,
+    height: y1 - y0,
+  };
+}
+
+function bboxFromPointString(pointString) {
+  const points = String(pointString || '').trim().split(/\s+/).map(function(point) {
+    const parts = point.split(',').map(Number);
+    return { x: parts[0], y: parts[1] };
+  }).filter(function(point) {
+    return Number.isFinite(point.x) && Number.isFinite(point.y);
+  });
+  if (!points.length) {
+    return null;
+  }
+  const xs = points.map(function(point) { return point.x; });
+  const ys = points.map(function(point) { return point.y; });
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+}
+
+function bboxFromPathData(pathData) {
+  const values = String(pathData || '').match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi);
+  if (!values || values.length < 2) {
+    return null;
+  }
+  const points = [];
+  for (let index = 0; index + 1 < values.length; index += 2) {
+    const x = Number(values[index]);
+    const y = Number(values[index + 1]);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      points.push({ x: x, y: y });
+    }
+  }
+  if (!points.length) {
+    return null;
+  }
+  const xs = points.map(function(point) { return point.x; });
+  const ys = points.map(function(point) { return point.y; });
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+}
+
+function bboxFromGraphDatum(datum) {
+  const attrs = datum && datum.attributes ? datum.attributes : {};
+  if (datum && datum.bbox) {
+    return normalizeBBox(datum.bbox);
+  }
+  if (datum && datum.tag === 'ellipse') {
+    const cx = finiteNumber(attrs.cx);
+    const cy = finiteNumber(attrs.cy);
+    const rx = finiteNumber(attrs.rx);
+    const ry = finiteNumber(attrs.ry);
+    if (cx != null && cy != null && rx != null && ry != null) {
+      return { x: cx - rx, y: cy - ry, width: 2 * rx, height: 2 * ry };
+    }
+  }
+  if (datum && (datum.tag === 'polygon' || datum.tag === 'polyline')) {
+    return bboxFromPointString(attrs.points);
+  }
+  if (datum && datum.tag === 'path') {
+    return bboxFromPathData(attrs.d);
+  }
+  if (datum && datum.tag === 'rect') {
+    const x = finiteNumber(attrs.x);
+    const y = finiteNumber(attrs.y);
+    const width = finiteNumber(attrs.width);
+    const height = finiteNumber(attrs.height);
+    if (x != null && y != null && width != null && height != null) {
+      return { x: x, y: y, width: width, height: height };
+    }
+  }
+  return null;
+}
+
+function bboxForGraphDataSubtree(root) {
+  const boxes = [];
+  function visit(datum) {
+    const box = bboxFromGraphDatum(datum);
+    if (box) {
+      boxes.push(box);
+    }
+    graphDataChildren(datum).forEach(visit);
+  }
+  visit(root);
+  return unionBBoxes(boxes);
+}
+
+function bboxForGraphDataNodes(root, targetNodeIds) {
+  const targetIds = new Set(targetNodeIds || []);
+  const targetBoxes = [];
+  const fallbackBoxes = [];
+
+  function visit(datum) {
+    const nodeId = graphDataNodeId(datum);
+    if (nodeId) {
+      const box = bboxForGraphDataSubtree(datum);
+      if (box) {
+        fallbackBoxes.push(box);
+        if (!targetIds.size || targetIds.has(nodeId)) {
+          targetBoxes.push(box);
+        }
+      }
+      return;
+    }
+    graphDataChildren(datum).forEach(visit);
+  }
+
+  visit(root);
+  return unionBBoxes(targetBoxes) || unionBBoxes(fallbackBoxes) || bboxForGraphDataSubtree(root);
+}
+
+function graphDataNodeIdSet(root) {
+  const nodeIds = new Set();
+  function visit(datum) {
+    const nodeId = graphDataNodeId(datum);
+    if (nodeId) {
+      nodeIds.add(nodeId);
+      return;
+    }
+    graphDataChildren(datum).forEach(visit);
+  }
+  visit(root);
+  return nodeIds;
+}
+
+function graphDataMatchesVisibleNodeSet(root, visibleNodeIds) {
+  const expectedIds = new Set(visibleNodeIds || []);
+  const actualIds = graphDataNodeIdSet(root);
+  if (!actualIds.size || actualIds.size !== expectedIds.size) {
+    return false;
+  }
+  return Array.from(actualIds).every(function(nodeId) {
+    return expectedIds.has(nodeId);
+  });
+}
+
+function svgViewport(svg) {
+  const viewBox = svg && svg.viewBox && svg.viewBox.baseVal;
+  if (viewBox && viewBox.width && viewBox.height) {
+    return {
+      x: viewBox.x,
+      y: viewBox.y,
+      width: viewBox.width,
+      height: viewBox.height,
+    };
+  }
+  return {
+    x: 0,
+    y: 0,
+    width: svg ? svg.clientWidth || Number(svg.getAttribute('width')) || 0 : 0,
+    height: svg ? svg.clientHeight || Number(svg.getAttribute('height')) || 0 : 0,
+  };
+}
+
+function graphDataViewport(root) {
+  const attrs = root && root.attributes ? root.attributes : {};
+  const viewBoxValues = String(attrs.viewBox || '').trim().split(/\s+/).map(Number);
+  if (
+    viewBoxValues.length === 4
+    && viewBoxValues.every(function(value) { return Number.isFinite(value); })
+    && viewBoxValues[2]
+    && viewBoxValues[3]
+  ) {
+    return {
+      x: viewBoxValues[0],
+      y: viewBoxValues[1],
+      width: viewBoxValues[2],
+      height: viewBoxValues[3],
+    };
+  }
+  const width = finiteNumber(attrs.width);
+  const height = finiteNumber(attrs.height);
+  if (width && height) {
+    return { x: 0, y: 0, width: width, height: height };
+  }
+  return null;
+}
+
+function layoutTransformForGraphElement(graphElement) {
+  const datum = graphElement && graphElement.__data__;
+  const translation = datum && datum.translation ? datum.translation : null;
+  if (!translation) {
+    return null;
+  }
+  const x = finiteNumber(translation.x);
+  const y = finiteNumber(translation.y);
+  const scale = finiteNumber(datum.scale);
+  if (x == null || y == null) {
+    return null;
+  }
+  return d3.zoomIdentity
+    .translate(x, y)
+    .scale(scale == null ? 1 : scale);
+}
+
+function computeNavigationCameraTransform(options) {
+  const bbox = normalizeBBox(options.targetBBox);
+  const viewport = options.viewport;
+  if (!bbox || !viewport || !viewport.width || !viewport.height) {
+    return null;
+  }
+
+  const current = options.currentTransform || d3.zoomIdentity;
+  const anchor = options.anchor || { x: 0.5, y: 0.45 };
+  const padding = options.padding == null ? 48 : options.padding;
+  const scalePolicy = options.scalePolicy || 'preserve';
+  const scaleExtent = options.scaleExtent || [0, Infinity];
+  const targetCenterX = bbox.x + bbox.width / 2;
+  const targetCenterY = bbox.y + bbox.height / 2;
+  const anchorX = viewport.x + viewport.width * anchor.x;
+  const anchorY = viewport.y + viewport.height * anchor.y;
+  let scale = current.k || 1;
+
+  if (scalePolicy === 'fit' || scalePolicy === 'fit-if-needed') {
+    const fitWidth = Math.max(viewport.width - 2 * padding, 1);
+    const fitHeight = Math.max(viewport.height - 2 * padding, 1);
+    const fitScale = Math.min(
+      fitWidth / Math.max(bbox.width, 1),
+      fitHeight / Math.max(bbox.height, 1),
+    );
+    const needsFit = bbox.width * scale > fitWidth || bbox.height * scale > fitHeight;
+    if (scalePolicy === 'fit' || needsFit) {
+      scale = fitScale;
+    }
+  }
+
+  scale = Math.max(scaleExtent[0], Math.min(scaleExtent[1], scale));
+  return d3.zoomIdentity
+    .translate(anchorX - scale * targetCenterX, anchorY - scale * targetCenterY)
+    .scale(scale);
+}
+
+function planNavigationCameraForNodeIds(nodeIds, reason) {
+  const plannedNodeIds = new Set(nodeIds || []);
+  depGraphCameraIntent = {
+    kind: 'navigate',
+    nodeIds: plannedNodeIds,
+    graphKey: visibleGraphKey(plannedNodeIds),
+    anchor: { x: 0.5, y: 0.45 },
+    scalePolicy: 'preserve',
+    padding: 48,
+    reason: reason || 'navigation',
+    epoch: ++depGraphCameraEpoch,
+  };
+}
+
+function planNavigationCameraForCurrentView(reason) {
+  planNavigationCameraForNodeIds(visibleNodeIdsForCurrentView(), reason);
+}
+
+function clearPendingNavigationCamera() {
+  depGraphCameraIntent = null;
+}
+
+function navigationCameraScaleBasis(context, intent) {
+  // A raw D3 zoom scale is only meaningful within the layout that produced it.
+  // Preserve it for recentering the current layout, but use the target layout's
+  // own transform when navigation causes a relayout.
+  const sameRenderedLayout =
+    intent.graphKey
+    && intent.graphKey === depGraphRenderedGraphKey
+    && intent.graphKey !== depGraphRenderingGraphKey;
+  if (sameRenderedLayout) {
+    return context.defaultTranslatedTransform || context.currentTransform || d3.zoomIdentity;
+  }
+  return context.layoutTransform
+    || context.defaultTranslatedTransform
+    || context.currentTransform
+    || d3.zoomIdentity;
+}
+
+function resolveNavigationCameraTransform(context) {
+  if (!depGraphCameraIntent || depGraphCameraIntent.kind !== 'navigate') {
+    return null;
+  }
+
+  const intent = depGraphCameraIntent;
+  if (!graphDataMatchesVisibleNodeSet(context.data, intent.nodeIds)) {
+    return null;
+  }
+  const targetBBox = bboxForGraphDataNodes(context.data, intent.nodeIds);
+  if (!targetBBox) {
+    console.warn('Dependency graph camera target could not be resolved.', intent);
+    return null;
+  }
+
+  const transform = computeNavigationCameraTransform({
+    currentTransform: navigationCameraScaleBasis(context, intent),
+    targetBBox: targetBBox,
+    viewport: graphDataViewport(context.data) || context.viewport || svgViewport(context.svg),
+    scaleExtent: context.scaleExtent || [0, Infinity],
+    anchor: intent.anchor,
+    scalePolicy: intent.scalePolicy,
+    padding: intent.padding,
+  });
+  if (transform) {
+    depGraphCameraIntent = null;
+  }
+  return transform;
+}
+
+function applyPendingNavigationCameraToRenderedGraph() {
+  if (!depGraphCameraIntent || typeof graphviz.zoomSelection !== 'function' || typeof graphviz.zoomBehavior !== 'function') {
+    return false;
+  }
+  const zoomSelection = graphviz.zoomSelection();
+  const zoomBehavior = graphviz.zoomBehavior();
+  const svg = zoomSelection && zoomSelection.node ? zoomSelection.node() : null;
+  if (!svg || !zoomBehavior) {
+    return false;
+  }
+
+  const transform = resolveNavigationCameraTransform({
+    data: typeof graphviz.data === 'function' ? graphviz.data() : null,
+    svg: svg,
+    graphElement: graphSceneGroup(),
+    currentTransform: d3.zoomTransform(svg),
+    defaultTranslatedTransform: d3.zoomTransform(svg),
+    layoutTransform: layoutTransformForGraphElement(graphSceneGroup()),
+    viewport: svgViewport(svg),
+    scaleExtent: graphviz.options().zoomScaleExtent,
+  });
+  if (!transform) {
+    return false;
+  }
+
+  setRelayoutAnimating(true);
+  zoomSelection
+    .transition(depGraphCameraTransitionFactory())
+    .call(zoomBehavior.transform, transform)
+    .on('end.depgraph-camera interrupt.depgraph-camera', function() {
+      setRelayoutAnimating(false);
+      syncOverlayViewport();
+    });
+  return true;
 }
 
 function graphSvgElement() {
@@ -1852,6 +2274,7 @@ function expandCollapsedSummary(summaryId, pivotNodeId) {
   }
 
   hideHoverTooltip();
+  clearPendingNavigationCamera();
   directExpansionNodeIds(summary, pivotNodeId).forEach(function(nodeId) {
     depGraphState.expandedNodeIds.add(nodeId);
   });
@@ -1959,8 +2382,9 @@ function resetNavigationSelection() {
     depGraphState.activeChildId = '';
     depGraphState.expandedNodeIds.clear();
     depGraphState.hoveredGroup = null;
-    clearFocus();
+    clearFocus({ refresh: false });
     renderNavigationSidebar();
+    planNavigationCameraForCurrentView('chapter-back');
     refreshGraphPresentation();
     emitNavigationSidebarEvent('chapter-back', topId, '', {
       nodeIds: Array.from(nodeIdsForSelection(topId, '')),
@@ -1977,8 +2401,9 @@ function resetNavigationSelection() {
   depGraphState.activeChildId = '';
   depGraphState.expandedNodeIds.clear();
   depGraphState.hoveredGroup = null;
-  clearFocus();
+  clearFocus({ refresh: false });
   renderNavigationSidebar();
+  planNavigationCameraForCurrentView('chapter-back');
   refreshGraphPresentation();
   emitNavigationSidebarEvent('chapter-back', '', '', {
     view: 'top',
@@ -1990,8 +2415,9 @@ function selectChapterGroup(topId) {
   depGraphState.activeChildId = '';
   depGraphState.expandedNodeIds.clear();
   depGraphState.hoveredGroup = null;
-  clearFocus();
+  clearFocus({ refresh: false });
   renderNavigationSidebar();
+  planNavigationCameraForCurrentView('chapter-select');
   refreshGraphPresentation();
   emitNavigationSidebarEvent('chapter-select', depGraphState.activeTopId, '', {
     nodeIds: Array.from(nodeIdsForSelection(depGraphState.activeTopId, '')),
@@ -2004,8 +2430,9 @@ function selectSubchapterGroup(topId, childId) {
   depGraphState.activeChildId = childId || '';
   depGraphState.expandedNodeIds.clear();
   depGraphState.hoveredGroup = null;
-  clearFocus();
+  clearFocus({ refresh: false });
   renderNavigationSidebar();
+  planNavigationCameraForCurrentView('chapter-select');
   refreshGraphPresentation();
   emitNavigationSidebarEvent('chapter-select', depGraphState.activeTopId, depGraphState.activeChildId, {
     nodeIds: Array.from(nodeIdsForSelection(depGraphState.activeTopId, depGraphState.activeChildId)),
@@ -2151,6 +2578,7 @@ function refreshGraphPresentation() {
   }
 
   const visibleNodeIds = visibleNodeIdsForCurrentView();
+  const graphKey = visibleGraphKey(visibleNodeIds);
   if (requestVisibleGraphLayout(visibleNodeIds)) {
     return;
   }
@@ -2176,6 +2604,9 @@ function refreshGraphPresentation() {
 
   syncEdgeHitboxPresentation(visibleNodeIds);
   renderCollapsedSummaries(visibleNodeIds, state);
+  if (graphKey !== depGraphRenderingGraphKey) {
+    applyPendingNavigationCameraToRenderedGraph();
+  }
 }
 
 function traverseSemanticDirectional(nodeId, edgeMap, nextNodeKey) {
@@ -2275,11 +2706,13 @@ function syncFocusedNodeState() {
   depGraphState.currentFocus = focusStateForNode(depGraphPinnedNode);
 }
 
-function clearFocus() {
+function clearFocus(options) {
   depGraphState.currentFocus = null;
   depGraphPinnedNode = null;
   depGraphState.hoveredNodeId = '';
-  applyFocusState(null);
+  if (!options || options.refresh !== false) {
+    applyFocusState(null);
+  }
   hideTooltip();
 }
 
@@ -2621,6 +3054,9 @@ function interactive() {
 
 captureTheoremSources();
 depGraphSidebarState = buildNavigationModel();
+if (typeof graphviz.cameraTransformResolver === 'function') {
+  graphviz.cameraTransformResolver(resolveNavigationCameraTransform);
+}
 graphviz.onerror(function(error) {
   depGraphRenderingGraphKey = null;
   setRelayoutAnimating(false);

@@ -330,21 +330,66 @@
     t = t.scale(newScale);
     return t;
   }
+  function getGraphElementZoomTransform(selection) {
+    return d3Zoom.zoomIdentity.translate(selection.datum().translation.x, selection.datum().translation.y).scale(selection.datum().scale);
+  }
+  function commitZoomBehaviorTransform(selection, transform) {
+    this._zoomBehavior.transform(this._zoomSelection, transform);
+
+    // Save the selection's new translation and scale.
+    this._translation = selection.datum().translation;
+    this._scale = selection.datum().scale;
+
+    // Set the original zoom transform to the translation and scale specified in
+    // the selection's data.
+    this._originalTransform = getGraphElementZoomTransform(selection);
+  }
+  function isTopLevelGraphTransform(selection) {
+    var datum = selection.datum();
+    return datum && datum.tag == 'g' && datum.parent && datum.parent.tag == 'svg' && datum.translation;
+  }
+  function getSvgViewport(svg) {
+    var viewBox = svg && svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      return {
+        x: viewBox.x,
+        y: viewBox.y,
+        width: viewBox.width,
+        height: viewBox.height
+      };
+    }
+    return {
+      x: 0,
+      y: 0,
+      width: svg ? svg.clientWidth || +svg.getAttribute('width') || 0 : 0,
+      height: svg ? svg.clientHeight || +svg.getAttribute('height') || 0 : 0
+    };
+  }
+  function resolveZoomBehaviorTransform(selection) {
+    var defaultTranslatedTransform = getTranslatedZoomTransform.call(this, selection);
+    if (!isTopLevelGraphTransform(selection) || typeof this._cameraTransformResolver != 'function') {
+      return defaultTranslatedTransform;
+    }
+    var svg = this._zoomSelection.node();
+    var resolvedTransform = this._cameraTransformResolver.call(this, {
+      data: this._data,
+      svg: svg,
+      graphElement: selection.node(),
+      currentTransform: d3Zoom.zoomTransform(svg),
+      defaultTranslatedTransform: defaultTranslatedTransform,
+      layoutTransform: getGraphElementZoomTransform(selection),
+      viewport: getSvgViewport(svg),
+      scaleExtent: this._options.zoomScaleExtent
+    });
+    return resolvedTransform || defaultTranslatedTransform;
+  }
   function translateZoomBehaviorTransform(selection) {
     // Translate the current zoom transform for the top level svg
     // uniformly with the given selection, using the difference
     // between the translation specified in the selection's data and
     // it's saved previous translation. The selection is normally the
     // top level g element of the graph.
-    this._zoomBehavior.transform(this._zoomSelection, getTranslatedZoomTransform.call(this, selection));
-
-    // Save the selections's new translation and scale.
-    this._translation = selection.datum().translation;
-    this._scale = selection.datum().scale;
-
-    // Set the original zoom transform to the translation and scale specified in
-    // the selection's data.
-    this._originalTransform = d3Zoom.zoomIdentity.translate(selection.datum().translation.x, selection.datum().translation.y).scale(selection.datum().scale);
+    commitZoomBehaviorTransform.call(this, selection, getTranslatedZoomTransform.call(this, selection));
   }
   function resetZoom(transition) {
     // Reset the zoom transform to the original zoom transform.
@@ -368,6 +413,13 @@
   }
   function zoomSelection() {
     return this._zoomSelection || null;
+  }
+  function cameraTransformResolver(resolver) {
+    if (arguments.length == 0) {
+      return this._cameraTransformResolver || null;
+    }
+    this._cameraTransformResolver = resolver;
+    return this;
   }
 
   function pathTween(points, d1) {
@@ -653,14 +705,17 @@
           if (attributeName == 'transform' && data.translation) {
             if (transitionInstance) {
               var onEnd = elementTransition.on("end");
+              var resolvedZoomTransform = null;
               elementTransition.on("start", function () {
                 if (graphvizInstance._zoomBehavior) {
                   // Update the transform to transition to, just before the transition starts
                   // in order to catch changes between the transition scheduling to its start.
+                  resolvedZoomTransform = resolveZoomBehaviorTransform.call(graphvizInstance, element);
+                  var initialZoomTransform = d3Zoom.zoomTransform(graphvizInstance._zoomSelection.node());
                   elementTransition.tween("attr.transform", function () {
                     var node = this;
                     return function (t) {
-                      node.setAttribute("transform", d3Interpolate.interpolateTransformSvg(d3Zoom.zoomTransform(graphvizInstance._zoomSelection.node()).toString(), getTranslatedZoomTransform.call(graphvizInstance, element).toString())(t));
+                      node.setAttribute("transform", d3Interpolate.interpolateTransformSvg(initialZoomTransform.toString(), resolvedZoomTransform.toString())(t));
                     };
                   });
                 }
@@ -668,14 +723,15 @@
                 onEnd.call(this);
                 // Update the zoom transform to the new translated transform
                 if (graphvizInstance._zoomBehavior) {
-                  translateZoomBehaviorTransform.call(graphvizInstance, element);
+                  commitZoomBehaviorTransform.call(graphvizInstance, element, resolvedZoomTransform || resolveZoomBehaviorTransform.call(graphvizInstance, element));
                 }
               });
             } else {
               if (graphvizInstance._zoomBehavior) {
                 // Update the transform attribute to set with the current pan translation
-                translateZoomBehaviorTransform.call(graphvizInstance, element);
-                attributeValue = getTranslatedZoomTransform.call(graphvizInstance, element).toString();
+                var zoomTransform = resolveZoomBehaviorTransform.call(graphvizInstance, element);
+                commitZoomBehaviorTransform.call(graphvizInstance, element, zoomTransform);
+                attributeValue = zoomTransform.toString();
               }
             }
           }
@@ -1961,6 +2017,7 @@
     resetZoom: resetZoom,
     zoomBehavior: zoomBehavior,
     zoomSelection: zoomSelection,
+    cameraTransformResolver: cameraTransformResolver,
     zoomScaleExtent: zoomScaleExtent,
     zoomTranslateExtent: zoomTranslateExtent,
     render: render,
@@ -2011,4 +2068,3 @@
   exports.graphviz = graphviz;
 
 }));
-//# sourceMappingURL=d3-graphviz.js.map
