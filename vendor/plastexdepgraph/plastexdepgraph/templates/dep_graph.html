@@ -1528,6 +1528,48 @@ function bindOverlayZoomSync() {
   depGraphZoomSyncBound = true;
 }
 
+function cloneWheelEvent(event) {
+  if (typeof WheelEvent === 'function') {
+    return new WheelEvent(event.type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      detail: event.detail,
+      screenX: event.screenX,
+      screenY: event.screenY,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
+      shiftKey: event.shiftKey,
+      metaKey: event.metaKey,
+      button: event.button,
+      buttons: event.buttons,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+      deltaZ: event.deltaZ,
+      deltaMode: event.deltaMode,
+    });
+  }
+
+  const clonedEvent = document.createEvent('Event');
+  clonedEvent.initEvent(event.type, true, true);
+  return clonedEvent;
+}
+
+function forwardOverlayWheelToGraphZoom(event) {
+  const liveSvg = graphSvgElement();
+  const zoomBehavior = typeof graphviz.zoomBehavior === 'function' ? graphviz.zoomBehavior() : null;
+  if (!liveSvg || !zoomBehavior) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  liveSvg.dispatchEvent(cloneWheelEvent(event));
+}
+
 function cleanupGraphvizSceneForRerender() {
   ensureEdgeHitboxLayer().replaceChildren();
   ensureCollapsedSummaryLayer().replaceChildren();
@@ -2961,6 +3003,8 @@ function bindGlobalInteractions() {
     return;
   }
   depGraphGlobalInteractionsBound = true;
+
+  graphOverlayElement.addEventListener('wheel', forwardOverlayWheelToGraphZoom, { passive: false });
 
   graphElement.addEventListener('click', function(event) {
     const target = event.target instanceof Element ? event.target : null;
